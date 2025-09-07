@@ -16,6 +16,5 @@ typedef struct Bus
 } Bus;
 
 void Bus_init(Bus* bus);
-void Bus_CPU_connect(Bus* bus, CPU6502* cpu);
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data);
 uint8_t Bus_read(Bus* bus, uint16_t addr);
