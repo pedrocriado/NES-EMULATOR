@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdio.h>
-#include <array>
+#include <stdint.h>
 
 #include "CPU6502.h"
 

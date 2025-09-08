@@ -72,9 +72,9 @@ typedef enum {
 } Opcode;
 
 typedef enum {
-    IMP, IMM, ZP0, ZPX, ZPY, 
-    IZX, IZY, ABS, ABX, ABY, 
-    IND, REL 
+    IMP, IMM, ACC, ZP0, ZPX, 
+    ZPY, IZX, IZY, ABS, ABX, 
+    ABY, IND, REL 
 } AddressMode;
 
 typedef uint8_t (*OpcodeFunction)(CPU6502* cpu);
@@ -91,13 +91,13 @@ INSTRUCTION lookup[256];
 
 lookup = 
 {
-	{ BRK, IMM, 7 },{ ORA, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ ORA, ZP0, 3 },{ ASL, ZP0, 5 },{ XXX, IMP, 5 },{ PHP, IMP, 3 },{ ORA, IMM, 2 },{ ASL, IMP, 2 },{ XXX, IMP, 2 },{ NOP, IMP, 4 },{ ORA, ABS, 4 },{ ASL, ABS, 6 },{ XXX, IMP, 6 },
+	{ BRK, IMM, 7 },{ ORA, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ ORA, ZP0, 3 },{ ASL, ZP0, 5 },{ XXX, IMP, 5 },{ PHP, IMP, 3 },{ ORA, IMM, 2 },{ ASL, ACC, 2 },{ XXX, IMP, 2 },{ NOP, IMP, 4 },{ ORA, ABS, 4 },{ ASL, ABS, 6 },{ XXX, IMP, 6 },
 	{ BPL, REL, 2 },{ ORA, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ ORA, ZPX, 4 },{ ASL, ZPX, 6 },{ XXX, IMP, 6 },{ CLC, IMP, 2 },{ ORA, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ ORA, ABX, 4 },{ ASL, ABX, 7 },{ XXX, IMP, 7 },
-	{ JSR, ABS, 6 },{ AND, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ BIT, ZP0, 3 },{ AND, ZP0, 3 },{ ROL, ZP0, 5 },{ XXX, IMP, 5 },{ PLP, IMP, 4 },{ AND, IMM, 2 },{ ROL, IMP, 2 },{ XXX, IMP, 2 },{ BIT, ABS, 4 },{ AND, ABS, 4 },{ ROL, ABS, 6 },{ XXX, IMP, 6 },
+	{ JSR, ABS, 6 },{ AND, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ BIT, ZP0, 3 },{ AND, ZP0, 3 },{ ROL, ZP0, 5 },{ XXX, IMP, 5 },{ PLP, IMP, 4 },{ AND, IMM, 2 },{ ROL, ACC, 2 },{ XXX, IMP, 2 },{ BIT, ABS, 4 },{ AND, ABS, 4 },{ ROL, ABS, 6 },{ XXX, IMP, 6 },
 	{ BMI, REL, 2 },{ AND, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ AND, ZPX, 4 },{ ROL, ZPX, 6 },{ XXX, IMP, 6 },{ SEC, IMP, 2 },{ AND, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ AND, ABX, 4 },{ ROL, ABX, 7 },{ XXX, IMP, 7 },
-	{ RTI, IMP, 6 },{ EOR, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ EOR, ZP0, 3 },{ LSR, ZP0, 5 },{ XXX, IMP, 5 },{ PHA, IMP, 3 },{ EOR, IMM, 2 },{ LSR, IMP, 2 },{ XXX, IMP, 2 },{ JMP, ABS, 3 },{ EOR, ABS, 4 },{ LSR, ABS, 6 },{ XXX, IMP, 6 },
+	{ RTI, IMP, 6 },{ EOR, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ EOR, ZP0, 3 },{ LSR, ZP0, 5 },{ XXX, IMP, 5 },{ PHA, IMP, 3 },{ EOR, IMM, 2 },{ LSR, ACC, 2 },{ XXX, IMP, 2 },{ JMP, ABS, 3 },{ EOR, ABS, 4 },{ LSR, ABS, 6 },{ XXX, IMP, 6 },
 	{ BVC, REL, 2 },{ EOR, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ EOR, ZPX, 4 },{ LSR, ZPX, 6 },{ XXX, IMP, 6 },{ CLI, IMP, 2 },{ EOR, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ EOR, ABX, 4 },{ LSR, ABX, 7 },{ XXX, IMP, 7 },
-    { RTS, IMP, 6 },{ ADC, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ ADC, ZP0, 3 },{ ROR, ZP0, 5 },{ XXX, IMP, 5 },{ PLA, IMP, 4 },{ ADC, IMM, 2 },{ ROR, IMP, 2 },{ XXX, IMP, 2 },{ JMP, IND, 5 },{ ADC, ABS, 4 },{ ROR, ABS, 6 },{ XXX, IMP, 6 },
+    { RTS, IMP, 6 },{ ADC, IZX, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 3 },{ ADC, ZP0, 3 },{ ROR, ZP0, 5 },{ XXX, IMP, 5 },{ PLA, IMP, 4 },{ ADC, IMM, 2 },{ ROR, ACC, 2 },{ XXX, IMP, 2 },{ JMP, IND, 5 },{ ADC, ABS, 4 },{ ROR, ABS, 6 },{ XXX, IMP, 6 },
 	{ BVS, REL, 2 },{ ADC, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ ADC, ZPX, 4 },{ ROR, ZPX, 6 },{ XXX, IMP, 6 },{ SEI, IMP, 2 },{ ADC, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ ADC, ABX, 4 },{ ROR, ABX, 7 },{ XXX, IMP, 7 },
 	{ NOP, IMP, 2 },{ STA, IZX, 6 },{ NOP, IMP, 2 },{ XXX, IMP, 6 },{ STY, ZP0, 3 },{ STA, ZP0, 3 },{ STX, ZP0, 3 },{ XXX, IMP, 3 },{ DEY, IMP, 2 },{ NOP, IMP, 2 },{ TXA, IMP, 2 },{ XXX, IMP, 2 },{ STY, ABS, 4 },{ STA, ABS, 4 },{ STX, ABS, 4 },{ XXX, IMP, 4 },
 	{ BCC, REL, 2 },{ STA, IZY, 6 },{ XXX, IMP, 2 },{ XXX, IMP, 6 },{ STY, ZPX, 4 },{ STA, ZPX, 4 },{ STX, ZPY, 4 },{ XXX, IMP, 4 },{ TYA, IMP, 2 },{ STA, ABY, 5 },{ TXS, IMP, 2 },{ XXX, IMP, 5 },{ NOP, IMP, 5 },{ STA, ABX, 5 },{ XXX, IMP, 5 },{ XXX, IMP, 5 },
