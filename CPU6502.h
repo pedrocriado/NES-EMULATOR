@@ -4,7 +4,7 @@
 
 #include "Bus.h"
 
-typedef enum
+typedef enum Flags
 {
     C = (1 << 0),	// Carry Bit
     Z = (1 << 1),	// Zero
@@ -48,6 +48,8 @@ void CPU_clock(CPU6502* cpu);
 void CPU_reset(CPU6502* cpu);
 void CPU_irq(CPU6502* cpu);
 void CPU_nmi(CPU6502* cpu);
+
+void CPU_branch_helper(CPU6502* cpu, bool condition);
 
 uint8_t CPU_get_flag(Flags flag);
 void CPU_set_flag(Flags flag, bool value);

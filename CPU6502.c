@@ -8,8 +8,14 @@ void CPU_init(CPU6502* cpu)
     cpu->x = 0x00;
     cpu->y = 0x00;
     cpu->s = 0xFD;
-    cpu->p = 0x04;
-    cpu->pc = 0xFFFC;
+    //TODO: add cycle-accurate IRQ timing.
+    //Note: The effect of changing this flag is delayed 1 instruction
+    cpu->p = I | U;
+
+    uint8_t low = CPU_read(cpu, 0xFFFC);
+    uint8_t high = CPU_read(cpu, 0xFFFD);
+    cpu->pc = ((uint16_t)high << 8) | low;
+
     cpu->ic = (InstructionContext){0,0,0,0,0};
 }  
 
@@ -54,12 +60,63 @@ void CPU_clock(CPU6502* cpu)
 
 void CPU_reset(CPU6502* cpu)
 {
+    cpu->s -= 3;
+    //TODO: add cycle-accurate IRQ timing.
+    //Note: The effect of changing this flag is delayed 1 instruction
+    cpu->p = cpu->p | I;
 
+    uint8_t low = CPU_read(cpu, 0xFFFC);
+    uint8_t high = CPU_read(cpu, 0xFFFD);
+    cpu->pc = ((uint16_t)high << 8) | low;
+
+    cpu->ic = (InstructionContext){0,0,0,0,7};
+}
+
+void CPU_irq(CPU6502* cpu)
+{
+    if(CPU_get_flag(cpu, I) == 0)
+    {
+        CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+        CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+
+        CPU_set_flag(cpu, B, 0);
+        CPU_set_flag(cpu, U, 1);
+        CPU_set_flag(cpu, I, 1);
+
+        CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+
+        uint16_t low = CPU_read(cpu, 0xFFFE);
+        uint16_t high = CPU_read(cpu, 0xFFFF);
+
+        cpu->pc = (high << 8) | low;
+
+        cpu->ic.cycles = 7;
+    }
+}
+
+void CPU_nmi(CPU6502* cpu)
+{
+    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+
+    CPU_set_flag(cpu, B, 0);
+    CPU_set_flag(cpu, U, 1);
+    CPU_set_flag(cpu, I, 1);
+
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+
+    uint16_t low = CPU_read(cpu, 0xFFFA);
+    uint16_t high = CPU_read(cpu, 0xFFFB);
+
+    cpu->pc = (high << 8) | low;
+
+    cpu->ic.cycles = 8;
 }
 
 uint8_t CPU_fetch(CPU6502* cpu)
 {
-    if(!(lookup[cpu->ic.opcode].addrmode == &IMP))
+    if(!(lookup[cpu->ic.opcode].addrmode == &IMP)
+       && !(lookup[cpu->ic.opcode].addrmode == &ACC))
         cpu->ic.fetched = CPU_read(cpu, cpu->ic.addr_abs);
     return cpu->ic.fetched;
 }
@@ -173,6 +230,20 @@ uint8_t REL(CPU6502* cpu)
     return 0;
 }	
 
+// Helper functions
+void CPU_branch_helper(CPU6502* cpu, bool condition) {
+    if (condition) {
+        cpu->ic.cycles++;
+
+        cpu->ic.addr_abs = cpu->pc + cpu->ic.addr_rel;
+
+        if ((cpu->ic.addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->ic.cycles++;
+
+        cpu->pc = cpu->ic.addr_abs;
+    }
+}
+
 // Operation Functions
 uint8_t ADC(CPU6502* cpu)
 {
@@ -224,179 +295,286 @@ uint8_t ASL(CPU6502* cpu)
 
 uint8_t BCC(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, C) == 0);
+    return 0;
 }
 uint8_t BCS(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, C) == 1);
+    return 0;
 }	
 uint8_t BEQ(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, Z) == 1);
+    return 0;
 }
 uint8_t BIT(CPU6502* cpu)
 {
+    uint8_t memory = CPU_fetch(cpu);
 
+    uint8_t temp = cpu->a & memory;
+
+    CPU_set_flag(cpu, Z, temp == 0);
+    CPU_set_flag(cpu, V, memory & 0x40);
+    CPU_set_flag(cpu, N, memory & 0x80);
+    
+    return 0;
 }	
 uint8_t BMI(CPU6502* cpu) 
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, N) == 1);
+    return 0;
 } 
 uint8_t BNE(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, Z) == 0);
+    return 0;
 }
 uint8_t BPL(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, N) == 0);
+    return 0;
 }	
 uint8_t BRK(CPU6502* cpu)
 {
+    cpu->pc++;
+    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
+    CPU_set_flag(cpu, I, 1);
+    CPU_set_flag(cpu, B, 1);
+
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+
+    CPU_set_flag(cpu, B, 0);
+
+    cpu->pc = (uint16_t) (CPU_read(cpu, 0xFFFF) << 8) | (uint16_t) CPU_read(cpu, 0xFFFE);
+
+    return 0;
 }
 uint8_t BVC(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, V) == 0);
+    return 0;
 }  
 uint8_t BVS(CPU6502* cpu)
 {
-
+    CPU_branch_helper(cpu, CPU_get_flag(cpu, V) == 1);
+    return 0;
 }
 uint8_t CLC(CPU6502* cpu)
 {
-
+    CPU_set_flag(cpu, C, 0);
+    return 0;
 }	
 uint8_t CLD(CPU6502* cpu)
 {
-
+    CPU_set_flag(cpu, D, 0);
+    return 0;
 }
 uint8_t CLI(CPU6502* cpu)
 {
-
+    //TODO: add cycle-accurate IRQ timing.
+    //Note: The effect of changing this flag is delayed 1 instruction
+    CPU_set_flag(cpu, I, 0);
+    return 0;
 }  
 uint8_t CLV(CPU6502* cpu)
 {
-
+    CPU_set_flag(cpu, V, 0);
+    return 0;
 }
 uint8_t CMP(CPU6502* cpu)
 {
+    uint8_t memory = CPU_fetch(cpu);
 
+    uint16_t temp = (uint16_t)cpu->a - (uint16_t)memory;
+
+    CPU_set_flag(cpu, C, cpu->a >= memory);
+    CPU_set_flag(cpu, Z, cpu->a == memory);
+    CPU_set_flag(cpu, N, temp & 0x0080);
+
+    return 1;
 }	
 uint8_t CPX(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t CPY(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t DEC(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t DEX(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }	
 uint8_t DEY(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t EOR(CPU6502* cpu)
 {
-
+    //TODO
+    return 1;
 }  
 uint8_t INC(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t INX(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }	
 uint8_t INY(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t JMP(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }  
 uint8_t JSR(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t LDA(CPU6502* cpu)
 {
-
+    //TODO
+    return 1;
 }	
 uint8_t LDX(CPU6502* cpu)
 {
-
+    //TODO
+    return 1;
 }
 uint8_t LDY(CPU6502* cpu)
 {
-
+    //TODO
+    return 1;
 }  
 uint8_t LSR(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t NOP(CPU6502* cpu)
 {
-
+    //TODO: add more function
+    return 0;
 }	
 uint8_t ORA(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t PHA(CPU6502* cpu)
 {
-
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->a);
+    return 0;
 }  
 uint8_t PHP(CPU6502* cpu)
 {
 
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p | B | U);
+
+    return 0;
 }
 uint8_t PLA(CPU6502* cpu)
 {
+    cpu->s++;
+    cpu->a = CPU_read(cpu, 0x0100 + cpu->s);
 
+    CPU_set_flag(cpu, Z, cpu->a == 0);
+    CPU_set_flag(cpu, N, cpu->a & 0x80);
+
+    return 0;
 }	
 uint8_t PLP(CPU6502* cpu)
 {
+    //TODO: add cycle-accurate IRQ timing.
+    //Note: The effect of changing this flag is delayed 1 instruction
+    cpu->s++;
+    cpu->p= CPU_read(cpu, 0x0100 + cpu->s);
 
+    return 0;
 }
 uint8_t ROL(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t ROR(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t RTI(CPU6502* cpu)
 {
+    cpu->s++;
+    cpu->p = CPU_read(cpu, 0x0100 + cpu->s++);
+    cpu->p &= ~B;
+    cpu->p &= ~U;
 
+    cpu->pc = (uint16_t)CPU_read(cpu, 0x0100 + cpu->s + 1) << 8 |
+              (uint16_t)CPU_read(cpu, 0x0100 + cpu->s++);
+
+    return 0;
 }	
 uint8_t RTS(CPU6502* cpu)
 {
-
+    //TODO
+    return 0;
 }
 uint8_t SBC(CPU6502* cpu)
 {
+    uint16_t memory = CPU_fetch(cpu);
 
+    uint16_t memory = memory ^ 0x00FF;
+
+    uint16_t temp = (uint16_t)cpu->a + memory + (uint16_t)(~CPU_get_flag(cpu, C)); 
+
+    CPU_set_flag(cpu, C, temp & 0xFF00);
+    CPU_set_flag(cpu, Z, (temp & 0x00FF) == 0);
+    CPU_set_flag(cpu, V, (temp ^ (uint16_t)cpu->a) & (temp ^ memory) & 0x0080);
+    CPU_set_flag(cpu, N, temp & 0x0080);
+
+    cpu->a = temp & 0x00FF;
+
+    return 1;
 }  
 uint8_t SEC(CPU6502* cpu)
 {
+    CPU_set_flag(cpu, C, 1);
 
+    return 0;
 }
 uint8_t SED(CPU6502* cpu)
 {
+    CPU_set_flag(cpu, D, 1);
 
+    return 0;
 }	
 uint8_t SEI(CPU6502* cpu)
 {
+    //TODO: add cycle-accurate IRQ timing.
+    //Note: The effect of changing this flag is delayed 1 instruction
+    CPU_set_flag(cpu, I, 1);
 
+    return 0;
 }
 uint8_t STA(CPU6502* cpu)
 {
