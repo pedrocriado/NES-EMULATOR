@@ -5,14 +5,18 @@
 
 #include "CPU6502.h"
 
-#define RAM_SIZE 0x0800
+#define RAM_SIZE 0x0800 // 2 Kilobytes of RAM
+#define PPU_REGISTERS_SIZE 0x0008 // 8 bytes
 
 typedef struct Bus
 {
     // devices connected to the bus
     CPU6502* cpu;
+    //PPU* ppu;
+    //APU* apu;
 
     uint8_t ram[RAM_SIZE];
+    uint8_t ppu_registers[PPU_REGISTERS_SIZE];
 } Bus;
 
 void Bus_init(Bus* bus);
