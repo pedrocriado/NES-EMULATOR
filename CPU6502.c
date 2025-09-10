@@ -8,7 +8,7 @@ void CPU_init(CPU6502* cpu)
     cpu->x = 0x00;
     cpu->y = 0x00;
     cpu->s = 0xFD;
-    //TODO: add cycle-accurate IRQ timing.
+    //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     cpu->p = I | U;
 
@@ -61,7 +61,7 @@ void CPU_clock(CPU6502* cpu)
 void CPU_reset(CPU6502* cpu)
 {
     cpu->s -= 3;
-    //TODO: add cycle-accurate IRQ timing.
+    //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     cpu->p = cpu->p | I;
 
@@ -374,7 +374,7 @@ uint8_t CLD(CPU6502* cpu)
 }
 uint8_t CLI(CPU6502* cpu)
 {
-    //TODO: add cycle-accurate IRQ timing.
+    //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     CPU_set_flag(cpu, I, 0);
     return 0;
@@ -398,87 +398,177 @@ uint8_t CMP(CPU6502* cpu)
 }	
 uint8_t CPX(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fetch(cpu);
+
+    uint16_t temp = (uint16_t)cpu->x - (uint16_t)memory;
+
+    CPU_set_flag(cpu, C, cpu->x >= memory);
+    CPU_set_flag(cpu, Z, cpu->x == memory);
+    CPU_set_flag(cpu, N, temp & 0x0080);
+
     return 0;
 }
 uint8_t CPY(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fetch(cpu);
+
+    uint16_t temp = (uint16_t)cpu->y - (uint16_t)memory;
+
+    CPU_set_flag(cpu, C, cpu->y >= memory);
+    CPU_set_flag(cpu, Z, cpu->y == memory);
+    CPU_set_flag(cpu, N, temp & 0x0080);
+
     return 0;
 }
 uint8_t DEC(CPU6502* cpu)
 {
-    //TODO
+    uint16_t memory = CPU_fetch(cpu) - 1;
+
+    CPU_write(cpu, cpu->ic.addr_abs, memory &0x00FF);
+
+    CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0);
+    CPU_set_flag(cpu, N, memory & 0x0080);
+
     return 0;
 }
 uint8_t DEX(CPU6502* cpu)
 {
-    //TODO
+    cpu->x--;
+
+    CPU_set_flag(cpu, Z, cpu->x == 0x00);
+    CPU_set_flag(cpu, N, cpu->x & 0x80);
+
     return 0;
 }	
 uint8_t DEY(CPU6502* cpu)
 {
-    //TODO
+    cpu->y--;
+
+    CPU_set_flag(cpu, Z, cpu->y == 0x00);
+    CPU_set_flag(cpu, N, cpu->y & 0x80);
+
     return 0;
 }
 uint8_t EOR(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fetch(cpu);
+
+    cpu->a = cpu->a ^ memory;
+
+    CPU_set_flag(cpu, Z, cpu->a == 0x00);
+    CPU_set_flag(cpu, N, cpu->a & 0x80);
+
     return 1;
 }  
 uint8_t INC(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fetch(cpu) + 1;
+
+    CPU_write(cpu, cpu->ic.addr_abs, memory);
+
+    CPU_set_flag(cpu, Z, memory == 0);
+    CPU_set_flag(cpu, N, memory & 0x80);
+    
     return 0;
 }
 uint8_t INX(CPU6502* cpu)
 {
-    //TODO
+    cpu->x++;
+
+    CPU_set_flag(cpu, Z, cpu->x == 0x00);
+    CPU_set_flag(cpu, N, cpu->x & 0x80);
+
     return 0;
 }	
 uint8_t INY(CPU6502* cpu)
 {
-    //TODO
+    cpu->y++;
+
+    CPU_set_flag(cpu, Z, cpu->y == 0x00);
+    CPU_set_flag(cpu, N, cpu->y & 0x80);
+
     return 0;
 }
 uint8_t JMP(CPU6502* cpu)
 {
-    //TODO
+    cpu->pc = cpu->ic.addr_abs;
+
     return 0;
 }  
 uint8_t JSR(CPU6502* cpu)
 {
-    //TODO
+    cpu->pc--;
+
+    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+
+    cpu->pc = cpu->ic.addr_abs;
+
     return 0;
 }
 uint8_t LDA(CPU6502* cpu)
 {
-    //TODO
+    cpu->a = CPU_fetch(cpu);
+
+    CPU_set_flag(cpu, Z, cpu->a == 0x00);
+    CPU_set_flag(cpu, N, cpu->a & 0x80);
+
     return 1;
 }	
 uint8_t LDX(CPU6502* cpu)
 {
-    //TODO
+    cpu->x = CPU_fetch(cpu);
+
+    CPU_set_flag(cpu, Z, cpu->x == 0x00);
+    CPU_set_flag(cpu, N, cpu->x & 0x80);
+
     return 1;
 }
 uint8_t LDY(CPU6502* cpu)
 {
-    //TODO
+    cpu->y = CPU_fetch(cpu);
+
+    CPU_set_flag(cpu, Z, cpu->y == 0x00);
+    CPU_set_flag(cpu, N, cpu->y & 0x80);
+
     return 1;
 }  
 uint8_t LSR(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fetch(cpu);
+
+    CPU_set_flag(cpu, C, memory & 0x01);
+
+    memory = memory >> 1;
+
+    CPU_set_flag(cpu, Z, memory == 0);
+    CPU_set_flag(cpu, N, memory & 0x80);
+
+    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+    {
+        cpu->a = memory;
+    }
+    else
+    {
+        CPU_write(cpu, cpu->ic.addr_abs, memory);
+    }
+
     return 0;
 }
 uint8_t NOP(CPU6502* cpu)
 {
-    //TODO: add more function
+    //TODO actions:
     return 0;
 }	
 uint8_t ORA(CPU6502* cpu)
 {
-    //TODO
+    uint8_t memory = CPU_fect(cpu);
+
+    cpu->a |= memory;
+
+    CPU_set_flag(cpu, Z, cpu->a == 0);
+    CPU_set_flag(cpu, N, cpu->a & 0x80);
+
     return 0;
 }
 uint8_t PHA(CPU6502* cpu)
@@ -505,7 +595,7 @@ uint8_t PLA(CPU6502* cpu)
 }	
 uint8_t PLP(CPU6502* cpu)
 {
-    //TODO: add cycle-accurate IRQ timing.
+    //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     cpu->s++;
     cpu->p= CPU_read(cpu, 0x0100 + cpu->s);
@@ -514,12 +604,37 @@ uint8_t PLP(CPU6502* cpu)
 }
 uint8_t ROL(CPU6502* cpu)
 {
-    //TODO
+    uint16_t memory = CPU_fetch(cpu);
+    
+    memory = (memory << 1) | CPU_get_flag(cpu, C);
+
+    CPU_set_flag(cpu, C, memory & 0xFF00);
+    CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0x0000);
+    CPU_set_flag(cpu, N, memory & 0x0080);
+
+    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+        cpu->a = memory & 0x00FF;
+    else
+        CPU_write(cpu, cpu->ic.addr_abs, memory & 0x00FF);
+
     return 0;
 }
 uint8_t ROR(CPU6502* cpu)
 {
-    //TODO
+    uint16_t memory = CPU_fetch(cpu);
+
+    CPU_set_flag(cpu, C, memory & 0x0001);
+
+    memory = ((uint16_t)CPU_get_flag(cpu, C) << 7) | (memory >> 1);
+
+    CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0x0000);
+    CPU_set_flag(cpu, N, memory & 0x0080);
+
+    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+        cpu->a = memory & 0x00FF;
+    else
+        CPU_write(cpu, cpu->ic.addr_abs, memory & 0x00FF);
+
     return 0;
 }
 uint8_t RTI(CPU6502* cpu)
@@ -536,7 +651,14 @@ uint8_t RTI(CPU6502* cpu)
 }	
 uint8_t RTS(CPU6502* cpu)
 {
-    //TODO
+    cpu->s++;
+    cpu->p = (uint16_t)CPU_read(cpu, 0x0100 + cpu->s++);
+    cpu->p &= ~B;
+    cpu->p &= ~U;
+
+    cpu->pc = ((uint16_t)CPU_read(cpu, 0x0100 + cpu->s) << 8) |
+              CPU_read(cpu, 0x0100 + cpu->s++);
+
     return 0;
 }
 uint8_t SBC(CPU6502* cpu)
@@ -570,7 +692,7 @@ uint8_t SED(CPU6502* cpu)
 }	
 uint8_t SEI(CPU6502* cpu)
 {
-    //TODO: add cycle-accurate IRQ timing.
+    //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     CPU_set_flag(cpu, I, 1);
 
