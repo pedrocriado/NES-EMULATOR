@@ -9,7 +9,6 @@
 void Bus_init(Bus* bus)
 {
     memset(bus->ram, 0, sizeof(bus->ram));
-    memset(bus->ppu_registers, 0, sizeof(bus->ppu_registers));
     bus->cpu = NULL;
 }
 
@@ -33,26 +32,8 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
     }
     else if(addr <= 0x3FFF)
     {
-        uint8_t reg = (addr & 0x0007);
-        switch(reg)
-        {
-            case 0:
-            // PPUCTRL
-            case 1:
-            // PPUMASK
-            case 2:
-            // PPUSTATUS
-            case 3:
-            // OAMADDR
-            case 4:
-            // PPUSCROLL
-            case 5:
-            // PPUADDR
-            case 6:
-            // PPUDATA
-                break;
-        }
-        bus->ppu_registers[reg] = data;
+        addr = (addr & 0x0007) + 0x2000;
+        PPU_wrtie(bus->ppu, addr, data);
     }
     // TODO: Implement 
     else if(addr <= 0x4017)
@@ -76,11 +57,12 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
     {
         return bus->ram[addr % RAM_SIZE];
     }
-    // TODO: Implement
     else if(addr <= 0x3FFF)
     {
-        bus->ram[addr];
+        addr = (addr & 0x0007) + 0x2000;
+        return PPU_read(bus->ppu, addr);
     }
+    // TODO: Implement
     else if(addr <= 0x4017)
     {
         bus->ram[addr];

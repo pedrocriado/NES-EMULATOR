@@ -4,7 +4,8 @@
 #include <stdint.h>
 
 #define RAM_SIZE 0x0800 // 2 KB of RAM
-#define PPU_REGISTER_SIZE 0x0008 // 8 bytes
+#define PALETTE_RAM 0x20 // 32 bytes
+#define PPU_REGISTER 0x0008 // 8 bytes
 
 struct CPU6502;
 struct PPU;
@@ -13,12 +14,18 @@ typedef struct Bus
 {
     // devices connected to the bus
     struct CPU6502* cpu;
-    //PPU* ppu;
+    struct PPU* ppu;
     //APU* apu;
 
     uint8_t ram[RAM_SIZE];
-    uint8_t ppu_registers[PPU_REGISTER_SIZE];
 } Bus;
+
+typedef struct PPUBus
+{
+    struct PPU* ppu;
+    uint8_t nametable[RAM_SIZE];
+    uint8_t palette[PALETTE_RAM];
+} PPUBus;
 
 void Bus_init(Bus* bus);
 void Bus_CPU_connect(Bus* bus, struct CPU6502* cpu);
