@@ -6,8 +6,9 @@
 
 #include "Bus.h"
 
-#define PPU_SCANLINE 256;
-#define PPU_HEIGHT 240;
+#define PPU_SCANLINE 256
+#define PPU_HEIGHT 240
+#define OAM_SIZE 256
 
 typedef enum PPU_Registers
 {
@@ -52,11 +53,15 @@ typedef struct PPU
     uint8_t x;
     uint8_t w;
 
+    uint8_t oat[OAM_SIZE];
+
     uint8_t scanline;
     uint8_t cycle;
     bool frame_comple;
 } PPU;
 
 void PPU_init(PPU* ppu);
+void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data);
+uint8_t PPU_get_register(PPU* ppu, uint16_t addr);
 void PPU_write(PPU* ppu, uint16_t addr, uint8_t data);
 uint8_t PPU_read(PPU* ppu, uint16_t addr);

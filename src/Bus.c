@@ -3,11 +3,13 @@
 #include "Bus.h"
 #include "CPU6502.h"
 #include "PPU.h"
+#include "Cartridge.h"
 
 #include <string.h>
 
 void Bus_init(Bus* bus)
 {
+    memset(bus, 0, sizeof(bus));
     memset(bus->ram, 0, sizeof(bus->ram));
     bus->cpu = NULL;
 }
@@ -24,6 +26,11 @@ void Bus_PPU_connect(Bus* bus, PPU* ppu)
     ppu->bus = bus;
 }
 
+void Bus_Cartridge_connect(Bus* bus, Cartridge* cart)
+{
+    bus->cart = cart;
+}
+
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
 {
     if(addr <= 0x1FFF)
@@ -33,22 +40,19 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
     else if(addr <= 0x3FFF)
     {
         addr = (addr & 0x0007) + 0x2000;
-        PPU_wrtie(bus->ppu, addr, data);
+        PPU_set_register(bus->ppu, addr, data);
     }
-    // TODO: Implement 
     else if(addr <= 0x4017)
     {
-        bus->ram[addr] = data;
+        // TODO
     }
     else if(addr <= 0x401F)
     {
-        bus->ram[addr] = data;
+        // TODO
     }
-    else if(addr <= 0xFFFF)
-    {
-        bus->ram[addr] = data;
-    }
-    // TODO: Implement
+
+    Mapper* mapper = bus->cart->mapper;
+    mapper->prg_write(mapper, addr, data);
 }
 
 uint8_t Bus_read(Bus* bus, uint16_t addr)
@@ -60,22 +64,16 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
     else if(addr <= 0x3FFF)
     {
         addr = (addr & 0x0007) + 0x2000;
-        return PPU_read(bus->ppu, addr);
+        return PPU_get_register(bus->ppu, addr);
     }
-    // TODO: Implement
     else if(addr <= 0x4017)
     {
-        bus->ram[addr];
+        // TODO
     }
     else if(addr <= 0x401F)
     {
-        bus->ram[addr];
+        // TODO
     }
-    else if(addr <= 0xFFFF)
-    {
-        bus->ram[addr];
-    }
-    // TODO: Implement
     
     return 0;
 }

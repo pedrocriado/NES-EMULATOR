@@ -9,12 +9,14 @@
 
 struct CPU6502;
 struct PPU;
+struct Cartridge;
 
 typedef struct Bus
 {
     // devices connected to the bus
     struct CPU6502* cpu;
     struct PPU* ppu;
+    struct Cartridge* cart;
     //APU* apu;
 
     uint8_t ram[RAM_SIZE];
@@ -30,5 +32,6 @@ typedef struct PPUBus
 void Bus_init(Bus* bus);
 void Bus_CPU_connect(Bus* bus, struct CPU6502* cpu);
 void Bus_PPU_connect(Bus* bus, struct PPU* ppu);
+void Bus_Cartridge_connect(Bus* bus, Cartridge* cart);
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data);
 uint8_t Bus_read(Bus* bus, uint16_t addr);
