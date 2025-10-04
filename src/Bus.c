@@ -77,3 +77,9 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
     
     return 0;
 }
+
+void Bus_free(Bus* bus)
+{
+    free(bus->ram);
+    free(bus);
+}

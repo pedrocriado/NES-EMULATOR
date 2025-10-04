@@ -8,13 +8,14 @@
 #include "Mappers/Mapper.h"
 #include "Mappers/Mapper0.c"
 
-void Cartridge_init(Cartridge* cart)
+void Cartridge_init(Cartridge* cart, Mapper* mapper)
 {
     cart = calloc(1, sizeof(Cartridge));
     if (cart == NULL)
     {
         exit(EXIT_FAILURE);
     }
+    cart->mapper = mapper;
     cart->mapper = calloc(1, sizeof(Mapper));
     if (cart == NULL)
     {
@@ -30,7 +31,10 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     memset(cart, 0, sizeof(Cartridge));
     memset(cart->mapper, 0, sizeof(Mapper));
 
-    //
+    // Set mapper variable for eaiser mapper use.
+    Mapper* mapper = &cart->mapper;
+
+    // Finding the path to the save file
     snprintf(cart->nesFilePath, 
              sizeof(cart->nesFilePath), 
              "%s%s", NES_FILE_PATH, fileName);
@@ -63,10 +67,10 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     {
     case 0x08:
         // NES 2.0
-        cart->mapper->format = NES2;
+        mapper->format = NES2;
     case 0x04:
         // Archaic iNES
-        cart->mapper->format = ARCHAIC_INES;
+        mapper->format = ARCHAIC_INES;
     case 0x00:
         // iNES
         for(int i = 12; i < INES_HEADER_SIZE;i++)
@@ -74,10 +78,10 @@ void Cartridge_load(Cartridge* cart, char* fileName)
             if(header[i] != 0x00)
                 exit(EXIT_FAILURE);
         }
-        cart->mapper->format = INES;
+        mapper->format = INES;
     default:
         // Archaic iNES or iNES 0.7
-        cart->mapper->format = ARCHAIC_INES;
+        mapper->format = ARCHAIC_INES;
     }
     
     // Store common information shared by all the file formats
@@ -106,13 +110,13 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     // If uncommon mapper needs to be incorperate then work most 
     // be done here
     if(header[6] & 0x8)
-        cart->mapper->mirror = FOUR_SCREEN; 
+        mapper->mirror = FOUR_SCREEN; 
     else if(header[6] & 0x1 == 1)
-        cart->mapper->mirror = VERTICAL;
+        mapper->mirror = VERTICAL;
     else if(header[6] & 0x1 == 0)
-        cart->mapper->mirror = HORIZONTAL;
+        mapper->mirror = HORIZONTAL;
 
-    switch(cart->mapper->format)
+    switch(mapper->format)
     {
     case ARCHAIC_INES:
         // I am not planning to be working on this file format
@@ -131,7 +135,7 @@ void Cartridge_load(Cartridge* cart, char* fileName)
             cart->prgRam = calloc(1, 0x2000 * header[8]);
         }
 
-        cart->mapper->tv = (header[9] & 0x01) ? NTSC : PAL;
+        mapper->tv = (header[9] & 0x01) ? NTSC : PAL;
         
         break;
 
@@ -147,7 +151,7 @@ void Cartridge_load(Cartridge* cart, char* fileName)
         if(header[10] & 0x0F)
         {
             cart->prgRam = calloc(1, (64 << (header[10] & 0x0F)));
-            cart->hasPrgRam = true;
+            mapper->hasPrgRam = cart->hasPrgRam = true;
         }
         if(header[10] & 0xF0)
         {
@@ -157,12 +161,12 @@ void Cartridge_load(Cartridge* cart, char* fileName)
                     sizeof(cart->savePath), 
                     "%s%s.sav", fileName);
             Cartridge_save_load(cart);
-            cart->hasPrgNvRam = true;
+            mapper->hasPrgNvRam = cart->hasPrgNvRam = true;
         }
         if(header[11] & 0x0F)
         {
             cart->chrRam = calloc(1, (64 << (header[11] & 0x0F)));
-            cart->hasChrRam = true;
+            mapper->hasChrRam = cart->hasChrRam = true;
         }
 
         // The main difference between this tv formats is the frame rates
@@ -170,43 +174,82 @@ void Cartridge_load(Cartridge* cart, char* fileName)
         switch (header[12] & 0x03)
         {
         case 0:
-            cart->mapper->tv = NTSC;
+            mapper->tv = NTSC;
             break;
         case 1:
-            cart->mapper->tv = PAL;
+            mapper->tv = PAL;
             break;
         case 2:
-            cart->mapper->tv = DUAL;    
+            mapper->tv = DUAL;    
             break;
         case 3:
-            cart->mapper->tv = DENDY;
+            mapper->tv = DENDY;
             break;
         }
 
         break;
     }
 
-    // Allocate memory to the mapper and call the
-    // proper mapper from the given id.
+    // Setting the mirror for the mapper
+    switch (mapper->mirror) {
+        case HORIZONTAL:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case VERTICAL:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2000;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case ONE_SCREEN_LOWER:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2000;
+            mapper->name_table_map[3] = 0x2000;
+            break;
+        case ONE_SCREEN_UPPER:
+            mapper->name_table_map[0] = 0x2400;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case FOUR_SCREEN:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2800;
+            mapper->name_table_map[3] = 0x2C00;
+            break;
+        default:
+            // Default to horizontal if unsupported
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+    }
+    // Set the proper mapper given the id
     switch (cart->mapperId)
     {
     case NROM:
-        set_mapper0(cart->mapper);
+        set_mapper0(mapper);
         break;
     case MMC1:
-        set_mapper1(cart->mapper);
+        set_mapper1(mapper);
         break;
     case UXROM:
-        set_mapper2(cart->mapper);
+        set_mapper2(mapper);
         break;
     case CNROM:
-        set_mapper3(cart->mapper);
+        set_mapper3(mapper);
         break;
     case MMC3:
-        set_mapper4(cart->mapper);
+        set_mapper4(mapper);
         break;
     case MMC5:
-        set_mapper5(cart->mapper);
+        set_mapper5(mapper);
         break;
     }
     fclose(file);

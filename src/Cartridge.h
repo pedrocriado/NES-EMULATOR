@@ -52,7 +52,7 @@ typedef enum MapperId
     
 } MapperId;
 
-void Cartridge_init(Cartridge* cart);
+void Cartridge_init(Cartridge* cart, Mapper* mapper);
 void Cartridge_load(Cartridge* cart, char* filePath);
 void Cartridge_save_load(Cartridge* cart, char* filePath);
 void Cartridge_save(Cartridge* cart);

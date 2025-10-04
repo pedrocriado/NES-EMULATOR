@@ -35,6 +35,10 @@ typedef struct Mapper
     uint16_t prgChunks;
     uint16_t chrChunks;
 
+    bool hasPrgRam;
+    bool hasChrRam;
+    bool hasPrgNvRam;
+
     Mirror mirror;
     TVSystem tv;
     FileFormat format;
@@ -50,13 +54,13 @@ typedef struct Mapper
 inline void Mapper_reset(Mapper* mapper)
 {
     if(!mapper) return;
-    free(mapper);
+    memset(mapper, 0, sizeof(Mapper));
 }
 
 inline void Mapper_free(Mapper* mapper)
 {
     if(!mapper) return;
-    memset(mapper, 0, sizeof(Mapper));
+    free(mapper);
 }
 
 void set_mapper0(Mapper* mapper);
