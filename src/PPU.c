@@ -49,36 +49,33 @@ void PPU_clock(PPU* ppu)
         
     if(ppu->scanLines < VISIBLE_SCANLINES)
     {
-        ppu->cycles = 0;
-        ppu->scanLines++;
-        if (ppu->scanLines == ALL_SCANLINES)
-        {
-            ppu->scanLines = 0;
-            ppu->frameComple = true;
-        }
+        //TODO: Screen rendering stuff
     }
     else if(ppu->scanLines == VISIBLE_SCANLINES)
     {
 
     }
-    else if(ppu->cycles < ALL_SCANLINES)
+    else if(ppu->scanLines < ALL_SCANLINES)
     {
-
+        if(ppu->pixels == 0)
+        {
+            ppu->status |= STS_VBLANK;
+        }
     }
     else
     {
 
     }
 
-    ppu->cycles++;
-    if(ppu->cycles == ALL_DOTS)
+    ppu->pixels++;
+    if(ppu->pixels == ALL_DOTS)
     {
-        ppu->cycles = 0;
+        ppu->pixels = 0;
         ppu->scanLines++;
         if(ppu->scanLines == ppu->scanLinePerFame)
         {
             ppu->scanLines = 0;
-            ppu->frameComple = false;
+            ppu->frameComple = true;
         }
     }
 }
@@ -89,63 +86,94 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
     {
         case PPUCTRL:
             ppu->ctrl = data;
+            ppu->t &= ~NAMETBL_SELECT;
+            ppu->t |= (ppu->ctrl & CTRL_NAMETABLE) << 10;
             break;
         case PPUMASK:
             ppu->mask = data;
             break;
         case PPUSTATUS:
-            ppu->status = data;
+            ppu->w = 0;
             break;
         case OAMADDR:
             ppu->oamAddr = data;
             break;
         case OAMDATA:
-            ppu->oamData = data;
+            ppu->oam[ppu->oamAddr] = data;
             break;
         case PPUSCROLL:
-            ppu->ppuScroll = data;
+            if(!ppu->w)
+            {//first write
+                ppu->t &= ~COARSE_X;
+                ppu->t |= (data >> 3);
+                ppu->x = data & 0x07;
+                ppu->w = 1;
+            }
+            else
+            {//second write
+                ppu->t &= ~COARSE_Y;
+                ppu->t |= (data << 5) & COARSE_Y;
+                ppu->t &= ~FINE_Y;
+                ppu->t |= (data << 12) & FINE_Y;
+                ppu->w = 0;
+            }
             break;
         case PPUADDR:
-            ppu->ppuAddr = data;
+            if(!ppu->w)
+            {//first write
+                ppu->t = ((data & 0x3F) << 8) | (ppu->t & 0x00FF);
+                ppu->w = 1;
+            }
+            else
+            {//second write
+                ppu->t = (ppu->t & 0xFF00) | data;
+                ppu->v = ppu->t;
+                ppu->w = 0;
+            }
             break;
         case PPUDATA:
-            ppu->ppuData = data;
+            ppu_wrtie(ppu, ppu->v, data);
+            ppu->v += (ppu->ctrl & CTRL_INCREMENT) ? 32 : 1;
             break;
     }
 }
 
 uint8_t PPU_get_register(PPU* ppu, uint16_t addr)
 {
+    uint8_t data = 0x00;
+
     switch(addr)
     {
         case PPUCTRL:
-            return ppu->ctrl;
             break;
         case PPUMASK:
-            return ppu->mask;
             break;
         case PPUSTATUS:
+            data = (ppu->status & 0xE0);
+            data |= (ppu->buffer & 0x1F);
+            ppu->status &= ~STS_VBLANK;
+            ppu->w = 0;
             return ppu->status;
-            break;
         case OAMADDR:
-            return ppu->oamAddr;
             break;
         case OAMDATA:
-            return ppu->oamData;
-            break;
+            return ppu->oam[ppu->oamAddr];
         case PPUSCROLL:
-            return ppu->ppuScroll;
             break;
         case PPUADDR:
-            return ppu->ppuAddr;
             break;
         case PPUDATA:
-            return ppu->ppuData;
-            break;
+            data = ppu->buffer;
+            ppu->buffer = PPU_read(ppu, ppu->v);
+            if(ppu->v & 0xC000)
+                data = ppu->buffer;
+            ppu->v += (ppu->ctrl & CTRL_INCREMENT) ? 32 : 1;
+            return data;
     }
 }
 
 void PPU_free(PPU* ppu)
 {
     free(ppu->screen);
+    free(ppu);
 }

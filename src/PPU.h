@@ -26,6 +26,23 @@ typedef enum PPU_Registers
     PPUDATA   = 0x2007
 } PPU_Registers;
 
+typedef enum Bit_Reference
+{
+    STS_VBLANK     = 0x80,
+    CTRL_INCREMENT = 0x04,
+    CTRL_NAMETABLE = 0x03,
+} Bit_Reference;
+
+// Used by both the t and v internal registers
+typedef enum VRAM_Reference
+{
+    COARSE_X       = 0x001F,
+    COARSE_Y       = 0x03E0,
+    NAMETBL_SELECT = 0x0C00,
+    FINE_Y          = 0x7000,
+    
+} VRAM_Reference;
+
 typedef struct PPU
 {
     PPUBus* bus;
@@ -35,16 +52,13 @@ typedef struct PPU
     uint8_t mask;
     uint8_t status;
     uint8_t oamAddr;
-    uint8_t oamData;
-    uint8_t ppuScroll;
-    uint8_t ppuAddr;
-    uint8_t ppuData;
+    uint8_t buffer;
 
     // Internal Registers
     uint16_t v, t;
     uint8_t  x, w;
 
-    uint8_t oat[OAM_SIZE];
+    uint8_t oam[OAM_SIZE];
     uint8_t pattern_table[0x2000];
     uint8_t name_table[0x1000];
     uint8_t palette[0x20];
@@ -52,8 +66,8 @@ typedef struct PPU
     uint32_t *screen;
 
     uint8_t scanLinePerFame;
-    uint8_t scanLines;
-    uint16_t cycles;
+    uint16_t scanLines;
+    uint16_t pixels;
     bool frameComple;
 } PPU;
 
