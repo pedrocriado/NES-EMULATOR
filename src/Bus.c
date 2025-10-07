@@ -1,17 +1,17 @@
 #include <stdint.h>
+#include <string.h>
 
 #include "Bus.h"
 #include "CPU6502.h"
 #include "PPU.h"
 #include "Cartridge.h"
 
-#include <string.h>
-
 void Bus_init(Bus* bus)
 {
     memset(bus, 0, sizeof(bus));
     memset(bus->ram, 0, sizeof(bus->ram));
     bus->cpu = NULL;
+    bus->ppu = NULL;
 }
 
 void Bus_CPU_connect(Bus* bus, CPU6502* cpu)
@@ -22,7 +22,7 @@ void Bus_CPU_connect(Bus* bus, CPU6502* cpu)
 
 void Bus_PPU_connect(Bus* bus, PPU* ppu)
 {
-    bus->cpu = ppu;
+    bus->ppu = ppu;
     ppu->bus = bus;
 }
 

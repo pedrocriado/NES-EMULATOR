@@ -4,8 +4,16 @@
 
 void PPU_init(PPU* ppu)
 {
-    ppu->screen = malloc(
-        sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+    memset(ppu, 0, sizeof(PPU));
+
+    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+    memset(ppu->screen, 0, sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+
+    ppu->scanLines = 0;
+    ppu->pixels = 0;
+    ppu->oddFrame = false;
+    ppu->frameComple = false;
+    ppu->nmi = false;
 }
 
 uint8_t PPU_read(PPU* ppu, uint16_t addr)
@@ -13,14 +21,11 @@ uint8_t PPU_read(PPU* ppu, uint16_t addr)
     addr &= 0x3FFF; // PPU address bus is 14 bits
 
     if (addr <= 0x1FFF) {
-        // Pattern tables (CHR ROM/RAM)
         // TODO: Use cartridge/mapper for CHR ROM/RAM access
         return ppu->pattern_table[addr];
     } else if (addr <= 0x2FFF) {
-        // Name tables (mirrored)
         return ppu->name_table[addr & 0x0FFF];
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
-        // Palette RAM indexes (mirrored every 32 bytes)
         return ppu->palette[addr & 0x1F];
     }
     return 0;
@@ -31,13 +36,10 @@ void PPU_write(PPU* ppu, uint16_t addr, uint8_t data)
     addr &= 0x3FFF;
 
     if (addr <= 0x1FFF) {
-        // Pattern tables (CHR RAM only, if present)
         ppu->pattern_table[addr] = data;
     } else if (addr <= 0x2FFF) {
-        // Name tables
         ppu->name_table[addr & 0x0FFF] = data;
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
-        // Palette RAM
         ppu->palette[addr & 0x1F] = data;
     }
 }
@@ -47,24 +49,75 @@ void PPU_clock(PPU* ppu)
     if(ppu->frameComple)
         return;
         
-    if(ppu->scanLines < VISIBLE_SCANLINES)
-    {
-        //TODO: Screen rendering stuff
-    }
-    else if(ppu->scanLines == VISIBLE_SCANLINES)
-    {
-
-    }
-    else if(ppu->scanLines < ALL_SCANLINES)
-    {
+    else if(ppu->scanLines < VISIBLE_SCANLINES)
+    { // 0 - 239
         if(ppu->pixels == 0)
         {
-            ppu->status |= STS_VBLANK;
+            //idle
+        }
+        else if(ppu->pixels >= 1 && ppu->pixels <= 256)
+        {
+            // Visible pixel rendering - cycle corresponds to pixel x = cycle-1
+            int x = ppu->pixels - 1;
+            int y = ppu->scanLines;
+            uint8_t palette_index = ((x / 32) + (y / 30)) & 0x3F;
+            ppu->screen[y * PPU_SCANLINE + x] = nes_palette_ntsc[palette_index];
+            // TODO: proper background + sprite pixel compositing + sprite 0 hit detection
+        }
+        else if(ppu->pixels >= 257 && ppu->pixels <= 320)
+        {
+            // TODO: perform sprite evaluation / fetch pattern bytes into sprite shifters
+
+        }
+        else if(ppu->pixels >= 321 && ppu->pixels <= 336)
+        {
+            // TODO: background fetches for next scanline
+
+        }
+        else if(ppu->pixels >= 337 && ppu->pixels <= 340)
+        {
+            // TODO: optional reads (usually ignored)
+
         }
     }
-    else
-    {
-
+    else if(ppu->scanLines == VISIBLE_SCANLINES)
+    { // 240
+        // Idle, nothing happens
+    }
+    else if(ppu->scanLines < ppu->scanLinesPerFame - 1)
+    { // 241 - 260/310
+        if(ppu->scanLines == 241 && ppu->pixels == 1)
+        {
+            ppu->status |= STS_VBLANK;
+            if(ppu->ctrl & CTRL_VBLANK)
+            {
+                ppu->nmi = true;
+            }
+        }
+    }
+    else if(ppu->scanLines  < ppu->scanLinesPerFame)
+    { // 261
+        if(ppu->pixels == 1)
+        {
+            ppu->status &= ~STS_VBLANK;
+            ppu->status &= ~STS_0_HIT;
+            ppu->status &= ~STS_OVERFLOW;
+            ppu->nmi = false;
+        }
+        if(ppu->pixels >= 280 && ppu->pixels <= 304)
+        {
+            if (ppu->mask & 0x18) {
+                ppu->v = (uint16_t)((ppu->v & 0x041F) | (ppu->t & 0x7BE0));
+            }
+        }
+        if((ppu->oddFrame) && (ppu->pixels == 339) && (ppu->mask & 0x18)) 
+        { // rendering enabled
+            ppu->pixels = 0;
+            ppu->scanLines = 0;
+            ppu->oddFrame = !ppu->oddFrame;
+            ppu->frameComple = true;
+            return;
+        }
     }
 
     ppu->pixels++;
@@ -72,9 +125,10 @@ void PPU_clock(PPU* ppu)
     {
         ppu->pixels = 0;
         ppu->scanLines++;
-        if(ppu->scanLines == ppu->scanLinePerFame)
+        if(ppu->scanLines == ppu->scanLinesPerFame)
         {
             ppu->scanLines = 0;
+            ppu->oddFrame = !ppu->oddFrame;
             ppu->frameComple = true;
         }
     }
@@ -170,6 +224,7 @@ uint8_t PPU_get_register(PPU* ppu, uint16_t addr)
             ppu->v += (ppu->ctrl & CTRL_INCREMENT) ? 32 : 1;
             return data;
     }
+    return 0;
 }
 
 void PPU_free(PPU* ppu)

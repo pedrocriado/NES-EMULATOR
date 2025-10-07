@@ -12,7 +12,8 @@
 
 #define NTSC_TIMING 60
 #define PAL_TIMING 50
-
+#define NTSC_SCANLINES 262
+#define PAL_SCANLINES  312
 typedef struct NES
 {
     CPU6502* cpu;

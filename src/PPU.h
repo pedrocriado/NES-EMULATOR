@@ -29,8 +29,11 @@ typedef enum PPU_Registers
 typedef enum Bit_Reference
 {
     STS_VBLANK     = 0x80,
+    STS_0_HIT      = 0x40,
+    STS_OVERFLOW   = 0x20,
     CTRL_INCREMENT = 0x04,
     CTRL_NAMETABLE = 0x03,
+    CTRL_VBLANK    = 0x80,
 } Bit_Reference;
 
 // Used by both the t and v internal registers
@@ -45,7 +48,7 @@ typedef enum VRAM_Reference
 
 typedef struct PPU
 {
-    PPUBus* bus;
+    Bus* bus;
 
     // Registers
     uint8_t ctrl;
@@ -65,10 +68,12 @@ typedef struct PPU
 
     uint32_t *screen;
 
-    uint8_t scanLinePerFame;
+    uint16_t scanLinesPerFame;
     uint16_t scanLines;
     uint16_t pixels;
+    bool oddFrame;
     bool frameComple;
+    bool nmi;
 } PPU;
 
 void PPU_init(PPU* ppu);

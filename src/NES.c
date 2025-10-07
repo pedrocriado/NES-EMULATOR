@@ -1,6 +1,7 @@
 #include "NES.h"
 
 #include <SDL.h>
+#include <stdint.h>
 
 void NES_init(NES* nes)
 {
@@ -19,7 +20,6 @@ void NES_init(NES* nes)
 
 void NES_start(NES* nes)
 {
-    //TODO: create proper implementation.
     char *filePath = "DuckTales 2 (USA)";
     Cartridge_load(nes->cart, filePath);
 
@@ -29,9 +29,11 @@ void NES_start(NES* nes)
     {
         case NTSC:
             nes->tvTiming = NTSC_TIMING;
+            nes->ppu->scanLinesPerFame = NTSC_SCANLINES;
             break;
         case PAL:
             nes->tvTiming = PAL_TIMING;
+            nes->ppu->scanLinesPerFame = PAL_SCANLINES;
             break;
     }
 
@@ -51,12 +53,16 @@ void NES_start(NES* nes)
         }
 
         nes->ppu->frameComple = false;
-        while(nes->ppu->frameComple)
+        uint8_t cpuTimer = 3;
+        while(!nes->ppu->frameComple)
         {
             PPU_clock(nes->cpu);
-            PPU_clock(nes->cpu);
-            PPU_clock(nes->cpu);
-            CPU_clock(nes->cpu);
+            if(--cpuTimer == 0)
+                cpuTimer = 3;
+                CPU_clock(nes->cpu);
+            if(nes->ppu->nmi)
+                nes->ppu->nmi = false;
+                CPU_nmi(nes->cpu);
         }     
 
         Graphics_render(nes->graphics, nes->ppu->screen);
