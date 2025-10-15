@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <SDL.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "Graphics.h"
 
-void Render_init(Graphics* grap){
+void Graphics_init(Graphics* grap)
+{
     // Initialize SDL
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL_Init Error: %s\n", SDL_GetError());
-        return 1;
+        return;
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");

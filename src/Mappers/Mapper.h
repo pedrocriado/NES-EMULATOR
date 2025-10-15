@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h> 
+#include <string.h>
 
 struct Cartridge;
 
@@ -45,10 +48,10 @@ typedef struct Mapper
 
     uint16_t name_table_map[4];
 
-    void (*prg_write)(Mapper*, uint16_t, uint8_t);
-    void (*chr_write)(Mapper*, uint16_t, uint8_t);
-    uint8_t (*prg_read)(Mapper*, uint16_t);
-    uint8_t (*chr_read)(Mapper*, uint16_t);
+    void (*prg_write)(struct Mapper*, uint16_t, uint8_t);
+    void (*chr_write)(struct Mapper*, uint16_t, uint8_t);
+    uint8_t (*prg_read)(struct Mapper*, uint16_t);
+    uint8_t (*chr_read)(struct Mapper*, uint16_t);
 } Mapper;
 
 inline void Mapper_reset(Mapper* mapper)
@@ -63,9 +66,9 @@ inline void Mapper_free(Mapper* mapper)
     free(mapper);
 }
 
-void set_mapper0(Mapper* mapper);
-void set_mapper1(Mapper* mapper);
-void set_mapper2(Mapper* mapper);
-void set_mapper3(Mapper* mapper);
-void set_mapper4(Mapper* mapper);
-void set_mapper5(Mapper* mapper);
+void set_mapper0(Mapper* mapper, struct Cartridge* cart);
+void set_mapper1(Mapper* mapper, struct Cartridge* cart);
+void set_mapper2(Mapper* mapper, struct Cartridge* cart);
+void set_mapper3(Mapper* mapper, struct Cartridge* cart);
+void set_mapper4(Mapper* mapper, struct Cartridge* cart);
+void set_mapper5(Mapper* mapper, struct Cartridge* cart);

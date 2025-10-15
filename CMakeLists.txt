@@ -14,9 +14,16 @@ set(SOURCES
     src/Bus.c
     src/NES.c
     src/Cartridge.c
+    src/Graphics.c
+    src/Mappers/Mapper0.c
+    src/Mappers/Mapper1.c
+    src/Mappers/Mapper2.c
+    src/Mappers/Mapper3.c
+    src/Mappers/Mapper4.c
+    src/Mappers/Mapper5.c
 )
 
-add_executable(nes src/main.c)
+add_executable(nes ${SOURCES})
 
 # SDL2 via FetchContent
 FetchContent_Declare(
@@ -27,5 +34,4 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL2)
 
 # Link SDL2 targets
-target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main)
-
+target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main  winmm)

@@ -1,38 +1,21 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "Bus.h"
 #include "CPU6502.h"
 #include "PPU.h"
 #include "Cartridge.h"
 
+#include "Mappers/Mapper.h"
+
 void Bus_init(Bus* bus)
 {
-    memset(bus, 0, sizeof(bus));
-    memset(bus->ram, 0, sizeof(bus->ram));
-    bus->cpu = NULL;
-    bus->ppu = NULL;
-}
-
-void Bus_CPU_connect(Bus* bus, CPU6502* cpu)
-{
-    bus->cpu = cpu;
-    cpu->bus = bus;
-}
-
-void Bus_PPU_connect(Bus* bus, PPU* ppu)
-{
-    bus->ppu = ppu;
-    ppu->bus = bus;
-}
-
-void Bus_Cartridge_connect(Bus* bus, Cartridge* cart)
-{
-    bus->cart = cart;
 }
 
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
 {
+    //printf("writing to %4x\n", addr);
     if(addr <= 0x1FFF)
     {
         bus->ram[addr & 0x07FF] = data;
@@ -50,9 +33,10 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
     {
         // TODO
     }
-
-    Mapper* mapper = bus->cart->mapper;
-    mapper->prg_write(mapper, addr, data);
+    else
+    {
+        bus->cart->mapper.prg_write(&bus->cart->mapper, addr, data);
+    }
 }
 
 uint8_t Bus_read(Bus* bus, uint16_t addr)
@@ -69,17 +53,20 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
     else if(addr <= 0x4017)
     {
         // TODO
+        return 0;
     }
     else if(addr <= 0x401F)
     {
         // TODO
+        return 0;
     }
-    
-    return 0;
+    else
+    {
+        return bus->cart->mapper.prg_read(&bus->cart->mapper, addr);
+    }
 }
 
 void Bus_free(Bus* bus)
 {
-    free(bus->ram);
     free(bus);
 }

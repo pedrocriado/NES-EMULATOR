@@ -5,12 +5,14 @@
 #include <stdbool.h>
 
 #include "Bus.h"
+#include "Cartridge.h"
 
 #define PPU_SCANLINE 256
 #define PPU_HEIGHT 240
-#define OAM_SIZE 256
+#define OAM_SIZE 64
+#define OAM_CACHE_SIZE 8
 #define VISIBLE_SCANLINES 240
-#define VISIBLE_DOTS 240
+#define VISIBLE_DOTS 256
 #define ALL_DOTS 341
 #define ALL_SCANLINES 262
 
@@ -28,12 +30,23 @@ typedef enum PPU_Registers
 
 typedef enum Bit_Reference
 {
-    STS_VBLANK     = 0x80,
-    STS_0_HIT      = 0x40,
-    STS_OVERFLOW   = 0x20,
-    CTRL_INCREMENT = 0x04,
-    CTRL_NAMETABLE = 0x03,
-    CTRL_VBLANK    = 0x80,
+    CTRL_NAMETABLE  = 0x03,
+    CTRL_INCREMENT  = 0x04,
+    CTRL_SP_TABLE   = 0x08,
+    CTRL_BG         = 0x10,
+    CTRL_SPR_SIZE   = 0x20,
+    CTRL_VBLANK     = 0x80,
+    MSK_BG_8        = 0x02,
+    MSK_SPR_8       = 0x04,
+    MSK_BG          = 0x08,
+    MSK_SPR         = 0x10,
+    MSK_SHOW_ALL    = 0x18,
+    STS_VBLANK      = 0x80,
+    STS_0_HIT       = 0x40,
+    STS_OVERFLOW    = 0x20,
+    OAM_PRIORITY    = 0x20,
+    OAM_FLIP_X      = 0x40,
+    OAM_FLIP_Y      = 0x80,
 } Bit_Reference;
 
 // Used by both the t and v internal registers
@@ -41,27 +54,40 @@ typedef enum VRAM_Reference
 {
     COARSE_X       = 0x001F,
     COARSE_Y       = 0x03E0,
-    NAMETBL_SELECT = 0x0C00,
-    FINE_Y          = 0x7000,
+    NAMETBL_X      = 0x0400,
+    NAMETBL_Y      = 0x0800,
+    FINE_Y         = 0x7000,
     
 } VRAM_Reference;
+
+typedef struct OAM
+{
+    uint8_t y;
+    uint8_t idx;
+    uint8_t attr;
+    uint8_t x;
+} OAM;
 
 typedef struct PPU
 {
     Bus* bus;
-
+    Cartridge* cart;
+    
     // Registers
     uint8_t ctrl;
     uint8_t mask;
     uint8_t status;
     uint8_t oamAddr;
-    uint8_t buffer;
+    uint8_t oamCacheLen;
+    uint8_t dataBus;
 
     // Internal Registers
     uint16_t v, t;
     uint8_t  x, w;
 
-    uint8_t oam[OAM_SIZE];
+    OAM oam[OAM_SIZE];
+    uint8_t cacheOam[OAM_CACHE_SIZE];
+
     uint8_t pattern_table[0x2000];
     uint8_t name_table[0x1000];
     uint8_t palette[0x20];
@@ -85,24 +111,13 @@ uint8_t PPU_get_register(PPU* ppu, uint16_t addr);
 void PPU_free(PPU* ppu);
 
 // NES palettes (ARGB format)
-static const uint32_t nes_palette_ntsc[64] = {
-    0x545454FF, 0x001E74FF, 0x081090FF, 0x300088FF, 0x440064FF, 0x5C0030FF, 0x540400FF, 0x3C1800FF,
-    0x202A00FF, 0x083A00FF, 0x004000FF, 0x003C28FF, 0x002840FF, 0x000000FF, 0x000000FF, 0x000000FF,
-    0x989698FF, 0x084CC4FF, 0x3032ECFF, 0x5C1EE4FF, 0x8814B0FF, 0xA01464FF, 0x982220FF, 0x783C00FF,
-    0x545A00FF, 0x287200FF, 0x087C00FF, 0x007628FF, 0x006678FF, 0x000000FF, 0x000000FF, 0x000000FF,
-    0xECEEECFF, 0x4C9AECFF, 0x787CECFF, 0xB062ECFF, 0xE454ECFF, 0xEC58B4FF, 0xEC6A64FF, 0xD48820FF,
-    0xA0AA00FF, 0x74C400FF, 0x4CD020FF, 0x38CC6CFF, 0x38B4CCFF, 0x3C3C3CFF, 0x000000FF, 0x000000FF,
-    0xECEEECFF, 0xA8CCECFF, 0xBCBCECFF, 0xD4B2ECFF, 0xECA8ECFF, 0xECA8D4FF, 0xECB4B0FF, 0xE4C490FF,
-    0xCCD278FF, 0xB4DE78FF, 0xA8E290FF, 0x98E2B0FF, 0xA0D6E4FF, 0xA0A2A0FF, 0x000000FF, 0x000000FF
-};
-
-static const uint32_t nes_palette_pal[64] = {
-    0x6A6D6AFF, 0x001E9EFF, 0x1E00D2FF, 0x5A00D2FF, 0x8C00A6FF, 0xA6005AFF, 0xA61E00FF, 0x7C2E00FF,
-    0x504600FF, 0x1E5A00FF, 0x006A00FF, 0x005A3CFF, 0x005A7CFF, 0x000000FF, 0x000000FF, 0x000000FF,
-    0xB6B6B6FF, 0x1E4EFF, 0x5A32FFFF, 0x8C1EFF, 0xC800C8FF, 0xD21E7CFF, 0xD2461EFF, 0xA66A00FF,
-    0x7C8C00FF, 0x32A600FF, 0x00B600FF, 0x00A66AFF, 0x0096B6FF, 0x000000FF, 0x000000FF, 0x000000FF,
-    0xFFFFFF, 0x6A96FFFF, 0x8C7CFFFF, 0xC86AFF, 0xFF5AFF, 0xFF5AB6FF, 0xFF7C7CFF, 0xFFB632FF,
-    0xD2D200FF, 0xA6E600FF, 0x7CFF32FF, 0x5AFF8CFF, 0x5AFFFF, 0x5A5A5AFF, 0x000000FF, 0x000000FF,
-    0xFFFFFF, 0xB6D2FFFF, 0xC8C8FFFF, 0xE6B6FFFF, 0xFFB6FFFF, 0xFFB6E6FF, 0xFFC8C8FF, 0xFFE6B6FF,
-    0xFFFFA6FF, 0xE6FFB6FF, 0xC8FFC8FF, 0xB6FFE6FF, 0xB6FFFF, 0xB6B6B6FF, 0x000000FF, 0x000000FF
+static const uint32_t nes_palette[64] = {
+    0xff666666, 0xff002a88, 0xff1412a7, 0xff3b00a4, 0xff5c007e, 0xff6e0040, 0xff6c0600, 0xff561d00,
+    0xff333500, 0xff0b4800, 0xff005200, 0xff004f08, 0xff00404d, 0xff000000, 0xff000000, 0xff000000,
+    0xffadadad, 0xff155fd9, 0xff4240ff, 0xff7527fe, 0xffa01acc, 0xffb71e7b, 0xffb53120, 0xff994e00,
+    0xff6b6d00, 0xff388700, 0xff0c9300, 0xff008f32, 0xff007c8d, 0xff000000, 0xff000000, 0xff000000,
+    0xfffffeff, 0xff64b0ff, 0xff9290ff, 0xffc676ff, 0xfff36aff, 0xfffe6ecc, 0xfffe8170, 0xffea9e22,
+    0xffbcbe00, 0xff88d800, 0xff5ce430, 0xff45e082, 0xff48cdde, 0xff4f4f4f, 0xff000000, 0xff000000,
+    0xfffffeff, 0xffc0dfff, 0xffd3d2ff, 0xffe8c8ff, 0xfffbc2ff, 0xfffec4ea, 0xfffeccc5, 0xfff7d8a5,
+    0xffe4e594, 0xffcfef96, 0xffbdf4ab, 0xffb3f3cc, 0xffb5ebf2, 0xffb8b8b8, 0xff000000, 0xff000000,
 };

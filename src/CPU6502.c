@@ -1,33 +1,38 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "CPU6502.h"
+#include "PPU.h"
 
-void CPU_init(CPU6502* cpu)
+void CPU_init(struct CPU6502* cpu)
 {
+    printf("[DEBUG] About to load NES CPU\n");
     cpu->a = 0x00;
     cpu->x = 0x00;
     cpu->y = 0x00;
     cpu->s = 0xFD;
+
+    cpu->nmi = false; cpu->irq = false;
+
+    cpu->p = I;
+
     //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
-    cpu->p = I | U;
 
-    uint8_t low = CPU_read(cpu, 0xFFFC);
-    uint8_t high = CPU_read(cpu, 0xFFFD);
-    cpu->pc = ((uint16_t)high << 8) | low;
-
+    uint8_t low = Bus_read(cpu->bus, 0xFFFC);
+    uint8_t high = Bus_read(cpu->bus, 0xFFFD);
+    
+    cpu->pc = (high << 8) | low;
     cpu->ic = (InstructionContext){0,0,0,0,0};
-}  
-
-uint8_t CPU_read(CPU6502* cpu, uint16_t addr)
-{
-    return Bus_read(cpu->bus, addr);
+    cpu->cycles = 7;
+    printf("[DEBUG] NES CPU loaded\n");
 }
 
-void CPU_write(CPU6502* cpu, uint16_t addr, uint8_t data)
+void CPU_free(CPU6502* cpu)
 {
-    Bus_write(cpu->bus, addr, data);
+    //no malloc done, we skip
 }
 
 uint8_t CPU_get_flag(CPU6502* cpu, Flags flag)
@@ -45,16 +50,31 @@ void CPU_set_flag(CPU6502* cpu, Flags flag, bool value)
 
 void CPU_clock(CPU6502* cpu)
 {
+    
     if (cpu->ic.cycles == 0)
     {
-        uint8_t opcode = CPU_read(cpu, cpu->pc++);
+        cpu->ic.opcode = Bus_read(cpu->bus, cpu->pc++);
 
-        cpu->ic.cycles = lookup[opcode].cycle_cnt;
+        // if(cpu->pc > 0xC053)
+        // {
+        printf("v: %4x t: %4x x: %4x\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x);
+        printf("ctrl: %2x mask: %2x status: %2x oamAddr: %4x\n", cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr);
+        printf("a:%2x x:%2x y:%2x sp:%2x p:%2x pc:%4x cycles:%d\n", cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc - 1, cpu->cycles);
+        printf("---------------------------------------------------------------\n");
+        cpu->ic.cycles = lookup[cpu->ic.opcode].cycle_cnt;
+        // }
+        uint8_t extra_cycles2 = lookup[cpu->ic.opcode].addrmode(cpu);
+        uint8_t extra_cycles1 = lookup[cpu->ic.opcode].operate(cpu);
 
-        uint8_t extra_cycles1 = lookup[opcode].operate(cpu);
-        uint8_t extra_cycles2 = lookup[opcode].addrmode(cpu);
-
+        // if(cpu->pc > 0xC053)
+        // {
+        // }
         cpu->ic.cycles += extra_cycles1 & extra_cycles2;
+        cpu->cycles += cpu->ic.cycles;
+        printf("v: %4x t: %4x x: %4x\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x);
+        printf("ctrl: %2x mask: %2x status: %2x oamAddr: %4x\n", cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr);
+        printf("opcode: %2x %4x\n", cpu->ic.opcode, cpu->ic.addr_abs);
+        printf("a:%2x x:%2x y:%2x sp:%2x p:%2x pc:%4x cycles:%d\n\n", cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
     }
     cpu->ic.cycles--;
 }
@@ -66,9 +86,9 @@ void CPU_reset(CPU6502* cpu)
     //Note: The effect of changing this flag is delayed 1 instruction
     cpu->p = cpu->p | I;
 
-    uint8_t low = CPU_read(cpu, 0xFFFC);
-    uint8_t high = CPU_read(cpu, 0xFFFD);
-    cpu->pc = ((uint16_t)high << 8) | low;
+    uint8_t low = Bus_read(cpu->bus, 0xFFFC);
+    uint8_t high = Bus_read(cpu->bus, 0xFFFD);
+    cpu->pc = (high << 8) | low;
 
     cpu->ic = (InstructionContext){0,0,0,0,7};
 }
@@ -77,17 +97,17 @@ void CPU_irq(CPU6502* cpu)
 {
     if(CPU_get_flag(cpu, I) == 0)
     {
-        CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
-        CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+        Bus_write(cpu->bus, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+        Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
         CPU_set_flag(cpu, B, 0);
         CPU_set_flag(cpu, U, 1);
         CPU_set_flag(cpu, I, 1);
 
-        CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+        Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
-        uint16_t low = CPU_read(cpu, 0xFFFE);
-        uint16_t high = CPU_read(cpu, 0xFFFF);
+        uint16_t low = Bus_read(cpu->bus, 0xFFFE);
+        uint16_t high = Bus_read(cpu->bus, 0xFFFF);
 
         cpu->pc = (high << 8) | low;
 
@@ -97,17 +117,17 @@ void CPU_irq(CPU6502* cpu)
 
 void CPU_nmi(CPU6502* cpu)
 {
-    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
     CPU_set_flag(cpu, B, 0);
     CPU_set_flag(cpu, U, 1);
     CPU_set_flag(cpu, I, 1);
 
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
-    uint16_t low = CPU_read(cpu, 0xFFFA);
-    uint16_t high = CPU_read(cpu, 0xFFFB);
+    uint16_t low = Bus_read(cpu->bus, 0xFFFA);
+    uint16_t high = Bus_read(cpu->bus, 0xFFFB);
 
     cpu->pc = (high << 8) | low;
 
@@ -116,9 +136,9 @@ void CPU_nmi(CPU6502* cpu)
 
 uint8_t CPU_fetch(CPU6502* cpu)
 {
-    if(!(lookup[cpu->ic.opcode].addrmode == &IMP)
-       && !(lookup[cpu->ic.opcode].addrmode == &ACC))
-        cpu->ic.fetched = CPU_read(cpu, cpu->ic.addr_abs);
+    if(!(lookup[cpu->ic.opcode].addrmode == IMP)
+       && !(lookup[cpu->ic.opcode].addrmode == ACC))
+        cpu->ic.fetched = Bus_read(cpu->bus, cpu->ic.addr_abs);
     return cpu->ic.fetched;
 }
 
@@ -139,27 +159,24 @@ uint8_t IMM(CPU6502* cpu)
 }
 uint8_t ZP0(CPU6502* cpu)
 {
-    cpu->ic.addr_abs = (uint16_t) CPU_read(cpu, cpu->pc++);
-    cpu->ic.addr_abs &= 0x00FF;
+    cpu->ic.addr_abs = Bus_read(cpu->bus, cpu->pc++);
     return 0;
 }
 uint8_t ZPX(CPU6502* cpu)
 {
-    cpu->ic.addr_abs = (uint16_t) CPU_read(cpu, cpu->pc++ + cpu->x);
-    cpu->ic.addr_abs &= 0x00FF;
+    cpu->ic.addr_abs = Bus_read(cpu->bus, cpu->pc++ + cpu->x);
     return 0;
 }
 uint8_t ZPY(CPU6502* cpu)
 {
-    cpu->ic.addr_abs = (uint16_t) CPU_read(cpu, cpu->pc++ + cpu->y);
-    cpu->ic.addr_abs &= 0x00FF;
+    cpu->ic.addr_abs = Bus_read(cpu->bus, cpu->pc++ + cpu->y);
     return 0;
 }
 uint8_t IZX(CPU6502* cpu)
 {
-    uint16_t t = (uint16_t) CPU_read(cpu, cpu->pc++);
-    uint16_t low = CPU_read(cpu, (t + (uint16_t) cpu->x) & 0x00FF);
-    uint16_t high = CPU_read(cpu, (t + (uint16_t) cpu->x + 1) & 0x00FF);
+    uint16_t temp = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, (temp + (uint16_t) cpu->x) & 0x00FF);
+    uint16_t high = Bus_read(cpu->bus, (temp + (uint16_t) cpu->x + 1) & 0x00FF);
 
     cpu->ic.addr_abs = (high << 8) | low;
 
@@ -167,9 +184,9 @@ uint8_t IZX(CPU6502* cpu)
 }  
 uint8_t IZY(CPU6502* cpu)
 {
-    uint16_t t = (uint16_t) CPU_read(cpu, cpu->pc++);
-    uint16_t low = CPU_read(cpu, t & 0x00FF);
-    uint16_t high = CPU_read(cpu, (t + 1) & 0x00FF);
+    uint8_t temp = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, temp);
+    uint16_t high = Bus_read(cpu->bus, (temp + 1) & 0x00FF);
 
     cpu->ic.addr_abs = ((high << 8) | low) + cpu->y;
 
@@ -179,8 +196,8 @@ uint8_t IZY(CPU6502* cpu)
 }
 uint8_t ABS(CPU6502* cpu)
 {
-    uint16_t low = CPU_read(cpu, cpu->pc++);
-    uint16_t high = CPU_read(cpu, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t high = Bus_read(cpu->bus, cpu->pc++);
 
     cpu->ic.addr_abs = (high << 8) | low;
 
@@ -188,8 +205,8 @@ uint8_t ABS(CPU6502* cpu)
 }	
 uint8_t ABX(CPU6502* cpu)
 {
-    uint16_t low = CPU_read(cpu, cpu->pc++);
-    uint16_t high = CPU_read(cpu, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t high = Bus_read(cpu->bus, cpu->pc++);
 
     cpu->ic.addr_abs = ((high << 8) | low) + cpu->x;
     
@@ -199,8 +216,8 @@ uint8_t ABX(CPU6502* cpu)
 }	
 uint8_t ABY(CPU6502* cpu)
 {
-    uint16_t low = CPU_read(cpu, cpu->pc++);
-    uint16_t high = CPU_read(cpu, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t high = Bus_read(cpu->bus, cpu->pc++);
 
     cpu->ic.addr_abs = ((high << 8) | low) + cpu->y;
     
@@ -210,21 +227,21 @@ uint8_t ABY(CPU6502* cpu)
 } 
 uint8_t IND(CPU6502* cpu)
 {
-    uint16_t low = CPU_read(cpu, cpu->pc++);
-    uint16_t high = CPU_read(cpu, cpu->pc++);
+    uint16_t low = Bus_read(cpu->bus, cpu->pc++);
+    uint16_t high = Bus_read(cpu->bus, cpu->pc++);
 
     uint16_t ptr = (high << 8) | low;
 
     if(low == 0x00FF) // Simulate page boundary hardware bug
-        cpu->ic.addr_abs = (CPU_read(cpu, ptr & 0xFF00) << 8) | CPU_read(cpu, ptr);
+        cpu->ic.addr_abs = (Bus_read(cpu->bus, ptr & 0xFF00) << 8) | Bus_read(cpu->bus, ptr);
     else
-        cpu->ic.addr_abs = (CPU_read(cpu, ptr + 1) << 8) | CPU_read(cpu, ptr);
+        cpu->ic.addr_abs = (Bus_read(cpu->bus, ptr + 1) << 8) | Bus_read(cpu->bus, ptr);
 
     return 0;
 }  
 uint8_t REL(CPU6502* cpu)
 {
-    cpu->ic.addr_rel = (uint16_t) CPU_read(cpu, cpu->pc++);
+    cpu->ic.addr_rel = Bus_read(cpu->bus, cpu->pc++);
 
     if(cpu->ic.addr_rel & 0x80)
         cpu->ic.addr_rel |= 0xFF00;
@@ -286,10 +303,16 @@ uint8_t ASL(CPU6502* cpu)
     CPU_set_flag(cpu, Z, (temp & 0x00FF) == 0);
     CPU_set_flag(cpu, N, temp & 0x80);
 
-    if(lookup[cpu->ic.opcode].operate == &ACC)
+    if(lookup[cpu->ic.opcode].operate == ACC)
+    {
         cpu->a = temp & 0x00FF;
-    else
-        CPU_write(cpu, cpu->ic.addr_abs, temp & 0x00FF);
+    }
+        
+    else    
+    {
+        Bus_write(cpu->bus, cpu->ic.addr_abs, temp & 0x00FF);
+    }
+        
 
     return 0;
 }
@@ -339,17 +362,17 @@ uint8_t BPL(CPU6502* cpu)
 uint8_t BRK(CPU6502* cpu)
 {
     cpu->pc++;
-    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
     CPU_set_flag(cpu, I, 1);
     CPU_set_flag(cpu, B, 1);
 
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
     CPU_set_flag(cpu, B, 0);
 
-    cpu->pc = (uint16_t) (CPU_read(cpu, 0xFFFF) << 8) | (uint16_t) CPU_read(cpu, 0xFFFE);
+    cpu->pc = (Bus_read(cpu->bus, 0xFFFF) << 8) | Bus_read(cpu->bus, 0xFFFE);
 
     return 0;
 }
@@ -425,7 +448,7 @@ uint8_t DEC(CPU6502* cpu)
 {
     uint16_t memory = CPU_fetch(cpu) - 1;
 
-    CPU_write(cpu, cpu->ic.addr_abs, memory &0x00FF);
+    Bus_write(cpu->bus, cpu->ic.addr_abs, memory &0x00FF);
 
     CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0);
     CPU_set_flag(cpu, N, memory & 0x0080);
@@ -465,7 +488,7 @@ uint8_t INC(CPU6502* cpu)
 {
     uint8_t memory = CPU_fetch(cpu) + 1;
 
-    CPU_write(cpu, cpu->ic.addr_abs, memory);
+    Bus_write(cpu->bus, cpu->ic.addr_abs, memory);
 
     CPU_set_flag(cpu, Z, memory == 0);
     CPU_set_flag(cpu, N, memory & 0x80);
@@ -500,8 +523,8 @@ uint8_t JSR(CPU6502* cpu)
 {
     cpu->pc--;
 
-    CPU_write(cpu, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
     cpu->pc = cpu->ic.addr_abs;
 
@@ -545,13 +568,13 @@ uint8_t LSR(CPU6502* cpu)
     CPU_set_flag(cpu, Z, memory == 0);
     CPU_set_flag(cpu, N, memory & 0x80);
 
-    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+    if(lookup[cpu->ic.opcode].addrmode == ACC)
     {
         cpu->a = memory;
     }
     else
     {
-        CPU_write(cpu, cpu->ic.addr_abs, memory);
+        Bus_write(cpu->bus, cpu->ic.addr_abs, memory);
     }
 
     return 0;
@@ -574,20 +597,22 @@ uint8_t ORA(CPU6502* cpu)
 }
 uint8_t PHA(CPU6502* cpu)
 {
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->a);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->a);
     return 0;
 }  
 uint8_t PHP(CPU6502* cpu)
 {
 
-    CPU_write(cpu, 0x0100 + cpu->s--, cpu->p | B | U);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p | B | U);
+
+    CPU_set_flag(cpu, B, 0);
 
     return 0;
 }
 uint8_t PLA(CPU6502* cpu)
 {
     cpu->s++;
-    cpu->a = CPU_read(cpu, 0x0100 + cpu->s);
+    cpu->a = Bus_read(cpu->bus, 0x0100 + cpu->s);
 
     CPU_set_flag(cpu, Z, cpu->a == 0);
     CPU_set_flag(cpu, N, cpu->a & 0x80);
@@ -599,7 +624,7 @@ uint8_t PLP(CPU6502* cpu)
     //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
     cpu->s++;
-    cpu->p= CPU_read(cpu, 0x0100 + cpu->s);
+    cpu->p= Bus_read(cpu->bus, 0x0100 + cpu->s);
 
     return 0;
 }
@@ -613,10 +638,10 @@ uint8_t ROL(CPU6502* cpu)
     CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0x0000);
     CPU_set_flag(cpu, N, memory & 0x0080);
 
-    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+    if(lookup[cpu->ic.opcode].addrmode == ACC)
         cpu->a = memory & 0x00FF;
     else
-        CPU_write(cpu, cpu->ic.addr_abs, memory & 0x00FF);
+        Bus_write(cpu->bus, cpu->ic.addr_abs, memory & 0x00FF);
 
     return 0;
 }
@@ -631,34 +656,32 @@ uint8_t ROR(CPU6502* cpu)
     CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0x0000);
     CPU_set_flag(cpu, N, memory & 0x0080);
 
-    if(lookup[cpu->ic.opcode].addrmode == &ACC)
+    if(lookup[cpu->ic.opcode].addrmode == ACC)
         cpu->a = memory & 0x00FF;
     else
-        CPU_write(cpu, cpu->ic.addr_abs, memory & 0x00FF);
+        Bus_write(cpu->bus, cpu->ic.addr_abs, memory & 0x00FF);
 
     return 0;
 }
 uint8_t RTI(CPU6502* cpu)
 {
     cpu->s++;
-    cpu->p = CPU_read(cpu, 0x0100 + cpu->s++);
+    cpu->p = Bus_read(cpu->bus, 0x0100 + cpu->s++);
     cpu->p &= ~B;
     cpu->p &= ~U;
 
-    cpu->pc = (uint16_t)CPU_read(cpu, 0x0100 + cpu->s + 1) << 8 |
-              (uint16_t)CPU_read(cpu, 0x0100 + cpu->s++);
+    cpu->pc = Bus_read(cpu->bus, 0x0100 + cpu->s + 1) << 8 |
+              Bus_read(cpu->bus, 0x0100 + cpu->s++);
 
     return 0;
 }	
 uint8_t RTS(CPU6502* cpu)
 {
-    cpu->s++;
-    cpu->p = (uint16_t)CPU_read(cpu, 0x0100 + cpu->s++);
-    cpu->p &= ~B;
-    cpu->p &= ~U;
+    uint16_t low = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
+    uint16_t high = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
 
-    cpu->pc = ((uint16_t)CPU_read(cpu, 0x0100 + cpu->s) << 8) |
-              CPU_read(cpu, 0x0100 + cpu->s++);
+    cpu->pc = (high << 8) | low;
+    cpu->pc++;
 
     return 0;
 }
@@ -668,7 +691,7 @@ uint8_t SBC(CPU6502* cpu)
 
     memory = memory ^ 0x00FF;
 
-    uint16_t temp = (uint16_t)cpu->a + memory + (uint16_t)(~CPU_get_flag(cpu, C)); 
+    uint16_t temp = (uint16_t)cpu->a + memory + (uint16_t)CPU_get_flag(cpu, C); 
 
     CPU_set_flag(cpu, C, temp & 0xFF00);
     CPU_set_flag(cpu, Z, (temp & 0x00FF) == 0);
@@ -701,19 +724,19 @@ uint8_t SEI(CPU6502* cpu)
 }
 uint8_t STA(CPU6502* cpu)
 {
-    CPU_write(cpu, cpu->ic.addr_abs, cpu->a);
+    Bus_write(cpu->bus, cpu->ic.addr_abs, cpu->a);
 
     return 0;
 }  
 uint8_t STX(CPU6502* cpu)
 {
-    CPU_write(cpu, cpu->ic.addr_abs, cpu->x);
+    Bus_write(cpu->bus, cpu->ic.addr_abs, cpu->x);
 
     return 0;
 }
 uint8_t STY(CPU6502* cpu)
 {
-    CPU_write(cpu, cpu->ic.addr_abs, cpu->y);
+    Bus_write(cpu->bus, cpu->ic.addr_abs, cpu->y);
 
     return 0;
 }	

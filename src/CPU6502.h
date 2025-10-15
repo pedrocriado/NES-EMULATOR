@@ -41,13 +41,17 @@ typedef struct CPU6502
     // Internal helper variables
     InstructionContext ic;
 
+    // Interrupts
+    bool nmi, irq;
+
+    int cycles;
+
     // Connected Devices
     struct Bus* bus;
 } CPU6502;
 
-void CPU_init(CPU6502* cpu);
-uint8_t CPU_read(CPU6502* cpu, uint16_t addr);
-void CPU_write(CPU6502* cpu, uint16_t addr, uint8_t data);
+void CPU_init(struct CPU6502* cpu);
+void CPU_free(CPU6502* cpu);
 void CPU_clock(CPU6502* cpu);
 void CPU_reset(CPU6502* cpu);
 void CPU_irq(CPU6502* cpu);

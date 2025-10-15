@@ -1,18 +1,21 @@
+#pragma once
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
-#include <Mappers/Mapper.h>
+#include "Mappers/Mapper.h"
 
 #define INES_HEADER_SIZE 16
-#define NES_FILE_PATH "/nes_files/"
-#define NES_SAVE_PATH "/nes_files/saves/"
+#define NES_FILE_PATH "./nes_files/"
+#define NES_SAVE_PATH "./nes_files/saves/"
 
 typedef struct Cartridge
 {
     char nesFilePath[260];
     char savePath[260]; 
-    Mapper* mapper;
+    Mapper mapper;
 
     uint16_t mapperId;
     uint8_t subMapper; // Might use in the future
@@ -48,13 +51,11 @@ typedef enum MapperId
     UXROM = 2,
     CNROM = 3,
     MMC3 = 4,
-    MMC5 = 5,
-    
+    MMC5 = 5
 } MapperId;
 
-void Cartridge_init(Cartridge* cart, Mapper* mapper);
 void Cartridge_load(Cartridge* cart, char* filePath);
-void Cartridge_save_load(Cartridge* cart, char* filePath);
+void Cartridge_save_load(Cartridge* cart);
 void Cartridge_save(Cartridge* cart);
 void Cartridge_reset(Cartridge* cart);
 void Cartridge_free(Cartridge* cart);
