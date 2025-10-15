@@ -163,7 +163,7 @@ void PPU_clock(PPU* ppu)
                     {
                         OAM sprite = ppu->oam[ppu->cacheOam[i]];
 
-                        if(pixel -1 - sprite.x  < 0 || pixel - sprite.x >= 8) continue;
+                        if(pixel - 1 < sprite.x || pixel - 1 >= sprite.x + 8) continue;
 
                         uint8_t xOff = (pixel -1 - sprite.x) % 8;
                         uint8_t yOff = (scanline - sprite.y) % len;

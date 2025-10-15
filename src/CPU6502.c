@@ -57,10 +57,7 @@ void CPU_clock(CPU6502* cpu)
 
         // if(cpu->pc > 0xC053)
         // {
-        printf("v: %4x t: %4x x: %4x\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x);
-        printf("ctrl: %2x mask: %2x status: %2x oamAddr: %4x\n", cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr);
-        printf("a:%2x x:%2x y:%2x sp:%2x p:%2x pc:%4x cycles:%d\n", cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc - 1, cpu->cycles);
-        printf("---------------------------------------------------------------\n");
+        
         cpu->ic.cycles = lookup[cpu->ic.opcode].cycle_cnt;
         // }
         uint8_t extra_cycles2 = lookup[cpu->ic.opcode].addrmode(cpu);
@@ -71,10 +68,7 @@ void CPU_clock(CPU6502* cpu)
         // }
         cpu->ic.cycles += extra_cycles1 & extra_cycles2;
         cpu->cycles += cpu->ic.cycles;
-        printf("v: %4x t: %4x x: %4x\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x);
-        printf("ctrl: %2x mask: %2x status: %2x oamAddr: %4x\n", cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr);
-        printf("opcode: %2x %4x\n", cpu->ic.opcode, cpu->ic.addr_abs);
-        printf("a:%2x x:%2x y:%2x sp:%2x p:%2x pc:%4x cycles:%d\n\n", cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
+        printf("ppu/v:%xt:%xx:%xctr:%xmsk:%xsts:%xoadr:%xcpu/opcode:%xa:%xx:%xy:%xsp:%xp:%xpc:%xcy:%d\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x, cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr, cpu->ic.opcode, cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
     }
     cpu->ic.cycles--;
 }
@@ -164,12 +158,12 @@ uint8_t ZP0(CPU6502* cpu)
 }
 uint8_t ZPX(CPU6502* cpu)
 {
-    cpu->ic.addr_abs = Bus_read(cpu->bus, cpu->pc++ + cpu->x);
+    cpu->ic.addr_abs = (Bus_read(cpu->bus, cpu->pc++) + cpu->x) & 0x00FF;
     return 0;
 }
 uint8_t ZPY(CPU6502* cpu)
 {
-    cpu->ic.addr_abs = Bus_read(cpu->bus, cpu->pc++ + cpu->y);
+    cpu->ic.addr_abs = (Bus_read(cpu->bus, cpu->pc++) + cpu->y) & 0x00FF;
     return 0;
 }
 uint8_t IZX(CPU6502* cpu)
