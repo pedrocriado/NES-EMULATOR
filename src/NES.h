@@ -10,6 +10,7 @@
 #include "APU.h"
 #include "Cartridge.h"
 #include "Graphics.h"
+#include "Controller.h"
 
 #define NTSC_TIMING 60
 #define PAL_TIMING 50
@@ -23,6 +24,7 @@ typedef struct NES
     Bus bus;
     Cartridge cart;
     Graphics graphics;
+    JoyPad Controller[2];
 
     uint8_t tvTiming;
     uint64_t fameTiming;

@@ -6,6 +6,7 @@
 #include "CPU6502.h"
 #include "PPU.h"
 #include "Cartridge.h"
+#include "Controller.h"
 
 #include "Mappers/Mapper.h"
 
@@ -15,7 +16,8 @@ void Bus_init(Bus* bus)
 
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
 {
-    //printf("writing to %4x\n", addr);
+    bus->dataBus = data;
+
     if(addr <= 0x1FFF)
     {
         bus->ram[addr & 0x07FF] = data;
@@ -27,7 +29,15 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
     }
     else if(addr <= 0x4017)
     {
-        // TODO
+        switch(addr)
+        {
+            case JOY1:
+                Controller_write(bus->controller[0], data);
+                break;
+            case JOY2:
+                
+                break;
+        }
     }
     else if(addr <= 0x401F)
     {
@@ -43,16 +53,30 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
 {
     if(addr <= 0x1FFF)
     {
-        return bus->ram[addr % RAM_SIZE];
+        bus->dataBus = bus->ram[addr % RAM_SIZE];
+        return bus->dataBus;
     }
     else if(addr <= 0x3FFF)
     {
         addr = (addr & 0x0007) + 0x2000;
-        return PPU_get_register(bus->ppu, addr);
+        bus->dataBus = PPU_get_register(bus->ppu, addr);
+        return bus->dataBus;
     }
     else if(addr <= 0x4017)
     {
-        // TODO
+        switch(addr)
+        {
+            case JOY1:
+                bus->dataBus &= 0xE0;
+                bus->dataBus |= Controller_read(bus->controller[0]) & 0x1F;
+                printf("g: %x\n", bus->dataBus);
+                return bus->dataBus;
+            case JOY2:
+                bus->dataBus &= 0xE0;
+                bus->dataBus |= Controller_read(bus->controller[1]) & 0x1F;
+                printf("T: %x\n", bus->dataBus);
+                return bus->dataBus;
+        }
         return 0;
     }
     else if(addr <= 0x401F)
@@ -62,7 +86,8 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
     }
     else
     {
-        return bus->cart->mapper.prg_read(&bus->cart->mapper, addr);
+        bus->dataBus = bus->cart->mapper.prg_read(&bus->cart->mapper, addr);
+        return bus->dataBus;
     }
 }
 

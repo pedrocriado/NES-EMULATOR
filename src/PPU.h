@@ -85,6 +85,16 @@ typedef struct PPU
     uint16_t v, t;
     uint8_t  x, w;
 
+    uint16_t bgShiftPtrLow;
+    uint16_t bgShiftPtrHigh;
+    uint16_t bgShiftAttrLow;
+    uint16_t bgShiftAttrHigh;
+
+    uint8_t bgNextTileId;
+    uint8_t bgNextTileAttr;
+    uint8_t bgNextTileLow;
+    uint8_t bgNextTileHigh;
+
     OAM oam[OAM_SIZE];
     uint8_t cacheOam[OAM_CACHE_SIZE];
 

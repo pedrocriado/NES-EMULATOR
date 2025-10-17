@@ -55,20 +55,14 @@ void CPU_clock(CPU6502* cpu)
     {
         cpu->ic.opcode = Bus_read(cpu->bus, cpu->pc++);
 
-        // if(cpu->pc > 0xC053)
-        // {
-        
         cpu->ic.cycles = lookup[cpu->ic.opcode].cycle_cnt;
-        // }
+
         uint8_t extra_cycles2 = lookup[cpu->ic.opcode].addrmode(cpu);
         uint8_t extra_cycles1 = lookup[cpu->ic.opcode].operate(cpu);
 
-        // if(cpu->pc > 0xC053)
-        // {
-        // }
         cpu->ic.cycles += extra_cycles1 & extra_cycles2;
         cpu->cycles += cpu->ic.cycles;
-        printf("ppu/v:%xt:%xx:%xctr:%xmsk:%xsts:%xoadr:%xcpu/opcode:%xa:%xx:%xy:%xsp:%xp:%xpc:%xcy:%d\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x, cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr, cpu->ic.opcode, cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
+        //printf("ppu/v:%xt:%xx:%xctr:%xmsk:%xsts:%xoadr:%xcpu/opcode:%xa:%xx:%xy:%xsp:%xp:%xpc:%xcy:%d\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x, cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr, cpu->ic.opcode, cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
     }
     cpu->ic.cycles--;
 }

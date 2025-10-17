@@ -8,7 +8,8 @@
 void Graphics_init(Graphics* grap)
 {
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO |
+        SDL_INIT_EVENTS) != 0) {
         printf("SDL_Init Error: %s\n", SDL_GetError());
         return;
     }

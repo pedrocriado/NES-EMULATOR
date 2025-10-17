@@ -14,6 +14,7 @@ set(SOURCES
     src/Bus.c
     src/NES.c
     src/Cartridge.c
+    src/Controller.c
     src/Graphics.c
     src/Mappers/Mapper0.c
     src/Mappers/Mapper1.c

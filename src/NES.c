@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static uint8_t NES_input_key(SDL_Scancode key);
+
 void NES_init(NES* nes, char *filePath)
 {
     memset(nes, 0, sizeof(NES));
@@ -18,6 +20,11 @@ void NES_init(NES* nes, char *filePath)
     nes->bus.cpu = &nes->cpu;
     nes->bus.ppu = &nes->ppu;
     nes->bus.cart = &nes->cart;
+    Controller_init(&nes->Controller[0]);
+    Controller_init(&nes->Controller[1]);
+    nes->bus.controller[0] = &nes->Controller[0];
+    nes->bus.controller[1] = &nes->Controller[1];
+
     nes->ppu.bus = &nes->bus;
     nes->ppu.cart = &nes->cart;
     nes->cpu.bus = &nes->bus;
@@ -63,10 +70,25 @@ void NES_start(NES* nes)
     while(running)
     {
         while(SDL_PollEvent(&event)) {
-            if(event.type == SDL_QUIT)
-                running = 0;
+            uint8_t key = NES_input_key(event.key.keysym.scancode);
+            switch(event.type)
+            {
+                case SDL_QUIT:
+                    running = 0;
+                    break;
+                case SDL_KEYDOWN:
+                    printf("down: %x\n", key);
+                    nes->bus.controller[0]->status |= key;
+                    printf("states: %x\n", nes->bus.controller[0]->status);
+                    break;
+                case SDL_KEYUP:
+                    printf("up: %x\n", key);
+                    nes->bus.controller[0]->status &= ~key;
+                    printf("states: %x\n", nes->bus.controller[0]->status);
+                    break;
+            }
         }
-    
+
         nes->ppu.frameComple = false;
         while(!nes->ppu.frameComple)
         {
@@ -95,6 +117,29 @@ void NES_start(NES* nes)
 
     NES_reset(nes);
     SDL_Quit();
+}
+
+static uint8_t NES_input_key(SDL_Scancode key)
+{
+    switch(key)
+    {
+        case SDL_SCANCODE_RIGHT:
+            return 0x80;
+        case SDL_SCANCODE_LEFT:
+            return 0x40;
+        case SDL_SCANCODE_DOWN:
+            return 0x20;
+        case SDL_SCANCODE_UP:
+            return 0x10;
+        case SDL_SCANCODE_F:
+            return 0x08;
+        case SDL_SCANCODE_G:
+            return 0x04;
+        case SDL_SCANCODE_X:
+            return 0x02;
+        case SDL_SCANCODE_Z:
+            return 0x01;
+    }
 }
 
 void NES_reset(NES* nes)

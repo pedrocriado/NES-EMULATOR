@@ -11,6 +11,13 @@
 struct CPU6502;
 struct PPU;
 struct Cartridge;
+struct Controller;
+
+typedef enum IORegister
+{ 
+    JOY1 = 0x4016,
+    JOY2 = 0x4017,
+} IORegister;
 
 typedef struct Bus
 {
@@ -18,8 +25,10 @@ typedef struct Bus
     struct CPU6502* cpu;
     struct PPU* ppu;
     struct Cartridge* cart;
+    struct JoyPad* controller[2];
     //APU* apu;
 
+    uint8_t dataBus;
     uint8_t ram[RAM_SIZE];
 } Bus;
 
