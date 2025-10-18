@@ -31,6 +31,15 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
     {
         switch(addr)
         {
+            case OAMDMA:
+                uint16_t page = data << 8;
+                for(int i = 0; i < 256; i++)
+                {
+                    uint8_t oam_data = Bus_read(bus, page + i);
+                    PPU_set_register(bus->ppu, OAMDATA, oam_data);
+                }
+                bus->cpu->ic.cycles += 513 + (bus->cpu->ic.cycles & 1);
+                break;
             case JOY1:
                 Controller_write(bus->controller[0], data);
                 break;

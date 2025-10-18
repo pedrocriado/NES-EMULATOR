@@ -7,9 +7,19 @@ int main(int argc, char *argv[]) {
     printf("[DEBUG] Starting NES emulator\n");
     
     // char *filePath = "Super Mario Bros (PC10)";
-    char *filePath = "Super Mario Bros. (World)";
+    // char *filePath = "Super Mario Bros. (World)";
     // char *filePath = "nestest";
     // char *filePath = "color_test";
+    // char *filePath = "oam_read";
+    // char *filePath = "oam3";
+    // char *filePath = "oam_stress";
+    // char *filePath = "sprite_ram";
+    char *filePath = "vram_access";
+    // char *filePath = "";
+    // char *filePath = "";
+    // char *filePath = "";
+    // char *filePath = "";
+    
 
     struct NES nes;
     printf("[DEBUG] About to initialize NES\n");

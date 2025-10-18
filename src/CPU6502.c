@@ -24,7 +24,7 @@ void CPU_init(struct CPU6502* cpu)
     
     cpu->pc = (high << 8) | low;
     cpu->ic = (InstructionContext){0,0,0,0,0};
-    cpu->cycles = 7;
+
     printf("[DEBUG] NES CPU loaded\n");
 }
 
@@ -59,7 +59,6 @@ void CPU_clock(CPU6502* cpu)
         uint8_t extra_cycles1 = lookup[cpu->ic.opcode].operate(cpu);
 
         cpu->ic.cycles += extra_cycles1 & extra_cycles2;
-        cpu->cycles += cpu->ic.cycles;
     }
     cpu->ic.cycles--;
 }

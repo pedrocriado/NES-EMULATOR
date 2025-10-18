@@ -44,8 +44,6 @@ typedef struct CPU6502
     // Interrupts
     bool nmi, irq;
 
-    int cycles;
-
     // Connected Devices
     struct Bus* bus;
 } CPU6502;

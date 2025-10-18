@@ -412,7 +412,6 @@ void PPU_clock(PPU* ppu)
 
 void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
 {
-    //printf("PSR: %4x\n", addr);
     switch(addr)
     {
         case PPUCTRL:
