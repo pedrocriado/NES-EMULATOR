@@ -68,13 +68,11 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
         {
             case JOY1:
                 bus->dataBus &= 0xE0;
-                bus->dataBus |= Controller_read(bus->controller[0]) & 0x1F;
-                printf("g: %x\n", bus->dataBus);
+                bus->dataBus |= Controller_read(bus->controller[0]) & 0x01;
                 return bus->dataBus;
             case JOY2:
                 bus->dataBus &= 0xE0;
-                bus->dataBus |= Controller_read(bus->controller[1]) & 0x1F;
-                printf("T: %x\n", bus->dataBus);
+                bus->dataBus |= Controller_read(bus->controller[1]) & 0x01;
                 return bus->dataBus;
         }
         return 0;

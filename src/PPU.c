@@ -41,7 +41,7 @@ void PPU_write(PPU* ppu, uint16_t addr, uint8_t data)
 
     if (addr <= 0x1FFF) {
         ppu->cart->mapper.chr_write(&ppu->cart->mapper, addr, data);
-    } else if (addr <= 0x2FFF) {
+    } else if (addr < 0x3F00) {
         addr &= 0x0FFF;  
         uint16_t tableAddr = ppu->cart->mapper.name_table_map[addr/0x0400];
         ppu->name_table[(tableAddr - 0x2000) + (addr & 0x03FF)] = data;
@@ -136,6 +136,9 @@ void PPU_clock(PPU* ppu)
     
     if(ppu->scanLines < VISIBLE_SCANLINES)
     { // 0 - 239 and 261
+        if(pixel == 64) {
+            evaluate_sprites(ppu, scanline);
+        }
         if((pixel >= 1 && pixel <=256) || (pixel >= 321 && pixel <336))
         {
             update_shifters(ppu);
@@ -162,7 +165,7 @@ void PPU_clock(PPU* ppu)
                 case 4:
                     if(ppu->mask & MSK_SHOW_ALL)
                     {
-                        addr = ppu->bgNextTileId * 16;
+                        addr = ppu->bgNextTileId << 4;
                         addr += (ppu->v >> 12) & 0x07;
                         addr |= (ppu->ctrl & CTRL_BG) << 8;
                         ppu->bgNextTileLow = PPU_read(ppu, addr);
@@ -188,9 +191,6 @@ void PPU_clock(PPU* ppu)
 
     if(ppu->scanLines < VISIBLE_SCANLINES || ppu->scanLines == ppu->scanLinesPerFame - 1)
     { // 0 - 239 and 261
-        if(pixel == 64) {
-            evaluate_sprites(ppu, scanline);
-        }
 
         if(pixel >= 1 && pixel <= 256)
         {// Visible pixel rendering
@@ -461,9 +461,8 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             }
             else
             {
-                ppu->t &= ~COARSE_Y;
+                ppu->t &= ~(COARSE_Y | FINE_Y);
                 ppu->t |= (data << 5) & COARSE_Y;
-                ppu->t &= ~FINE_Y;
                 ppu->t |= (data << 12) & FINE_Y;
                 ppu->w = 0;
             }

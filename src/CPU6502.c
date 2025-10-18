@@ -9,9 +9,7 @@
 void CPU_init(struct CPU6502* cpu)
 {
     printf("[DEBUG] About to load NES CPU\n");
-    cpu->a = 0x00;
-    cpu->x = 0x00;
-    cpu->y = 0x00;
+    cpu->a = cpu->x = cpu->y = 0x00;
     cpu->s = 0xFD;
 
     cpu->nmi = false; cpu->irq = false;
@@ -62,7 +60,6 @@ void CPU_clock(CPU6502* cpu)
 
         cpu->ic.cycles += extra_cycles1 & extra_cycles2;
         cpu->cycles += cpu->ic.cycles;
-        //printf("ppu/v:%xt:%xx:%xctr:%xmsk:%xsts:%xoadr:%xcpu/opcode:%xa:%xx:%xy:%xsp:%xp:%xpc:%xcy:%d\n", cpu->bus->ppu->v, cpu->bus->ppu->t, cpu->bus->ppu->x, cpu->bus->ppu->ctrl, cpu->bus->ppu->mask, cpu->bus->ppu->status, cpu->bus->ppu->oamAddr, cpu->ic.opcode, cpu->a, cpu->x, cpu->y, cpu->s, cpu->p, cpu->pc, cpu->cycles);
     }
     cpu->ic.cycles--;
 }
@@ -291,7 +288,7 @@ uint8_t ASL(CPU6502* cpu)
     CPU_set_flag(cpu, Z, (temp & 0x00FF) == 0);
     CPU_set_flag(cpu, N, temp & 0x80);
 
-    if(lookup[cpu->ic.opcode].operate == ACC)
+    if(lookup[cpu->ic.opcode].addrmode == ACC)
     {
         cpu->a = temp & 0x00FF;
     }
@@ -569,7 +566,65 @@ uint8_t LSR(CPU6502* cpu)
 }
 uint8_t NOP(CPU6502* cpu)
 {
-    //TODO actions:
+    switch(cpu->ic.opcode)
+    {
+        case 0x04:
+            return 0;
+        case 0x0C:
+            return 0;
+        case 0x14:
+            return 0;
+        case 0x1A:
+            return 0;
+        case 0x1C:
+            return 1;
+        case 0x34:
+            return 0;
+        case 0x3A:
+            return 0;
+        case 0x3C:
+            return 1;
+        case 0x44:
+            return 0;
+        case 0x54:
+            return 0;
+        case 0x5A:
+            return 0;
+        case 0x5C:
+            return 1;
+        case 0x64:
+            return 0;
+        case 0x74:
+            return 0;
+        case 0x7A:
+            return 0;
+        case 0x7C:
+            return 1;
+        case 0x80:
+            return 0;
+        case 0x82:
+            return 0;
+        case 0x89:
+            return 0;
+        case 0xC2:
+            return 0;
+        case 0xD4:
+            return 0;
+        case 0xDA:
+            return 0;
+        case 0xDC:
+            return 1;
+        case 0xE2:
+            return 0;
+        case 0xEA:
+            return 0;
+        case 0xF4:
+            return 0;
+        case 0xFA:
+            return 0;
+        case 0xFC:
+            return 1;
+    }
     return 0;
 }	
 uint8_t ORA(CPU6502* cpu)
@@ -611,8 +666,7 @@ uint8_t PLP(CPU6502* cpu)
 {
     //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
-    cpu->s++;
-    cpu->p= Bus_read(cpu->bus, 0x0100 + cpu->s);
+    cpu->p= Bus_read(cpu->bus, 0x0100 + ++cpu->s);
 
     return 0;
 }
@@ -637,9 +691,10 @@ uint8_t ROR(CPU6502* cpu)
 {
     uint16_t memory = CPU_fetch(cpu);
 
+    uint8_t old_carry = CPU_get_flag(cpu, C);
+    
     CPU_set_flag(cpu, C, memory & 0x0001);
-
-    memory = ((uint16_t)CPU_get_flag(cpu, C) << 7) | (memory >> 1);
+    memory = ((uint16_t)old_carry << 7) | (memory >> 1);
 
     CPU_set_flag(cpu, Z, (memory & 0x00FF) == 0x0000);
     CPU_set_flag(cpu, N, memory & 0x0080);
@@ -653,13 +708,14 @@ uint8_t ROR(CPU6502* cpu)
 }
 uint8_t RTI(CPU6502* cpu)
 {
-    cpu->s++;
-    cpu->p = Bus_read(cpu->bus, 0x0100 + cpu->s++);
+    cpu->p = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
     cpu->p &= ~B;
     cpu->p &= ~U;
 
-    cpu->pc = Bus_read(cpu->bus, 0x0100 + cpu->s + 1) << 8 |
-              Bus_read(cpu->bus, 0x0100 + cpu->s++);
+    uint16_t low = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
+    uint16_t high = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
+    
+    cpu->pc =  high << 8 | low;
 
     return 0;
 }	

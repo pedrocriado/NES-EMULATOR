@@ -6,8 +6,10 @@
 int main(int argc, char *argv[]) {
     printf("[DEBUG] Starting NES emulator\n");
     
-    //char *filePath = "Super Mario Bros (PC10)";
-    char *filePath = "nestest";
+    // char *filePath = "Super Mario Bros (PC10)";
+    char *filePath = "Super Mario Bros. (World)";
+    // char *filePath = "nestest";
+    // char *filePath = "color_test";
 
     struct NES nes;
     printf("[DEBUG] About to initialize NES\n");

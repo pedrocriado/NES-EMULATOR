@@ -15,8 +15,9 @@ struct Controller;
 
 typedef enum IORegister
 { 
-    JOY1 = 0x4016,
-    JOY2 = 0x4017,
+    OAMDMA = 0x4014,
+    JOY1   = 0x4016,
+    JOY2   = 0x4017,
 } IORegister;
 
 typedef struct Bus

@@ -18,8 +18,8 @@ uint8_t Controller_read(JoyPad* ctrl)
 {
     if(ctrl->idx > 7) return 1;
 
-    uint8_t res = ctrl->status & (1 << ctrl->idx);
+    uint8_t res = (ctrl->status >> ctrl->idx) & 0x01;
     if(!ctrl->strobe) ctrl->idx++;
 
-    return res != 0;
+    return res;
 }
