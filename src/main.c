@@ -6,7 +6,7 @@
 int main(int argc, char *argv[]) {
     printf("[DEBUG] Starting NES emulator\n");
     
-    // char *filePath = "Super Mario Bros (PC10)";
+    char *filePath = "Super Mario Bros (PC10)";
     // char *filePath = "Super Mario Bros. (World)";
     // char *filePath = "nestest";
     // char *filePath = "color_test";
@@ -14,7 +14,14 @@ int main(int argc, char *argv[]) {
     // char *filePath = "oam3";
     // char *filePath = "oam_stress";
     // char *filePath = "sprite_ram";
-    char *filePath = "vram_access";
+    // char *filePath = "vram_access";
+    // char *filePath = "tv";
+    // char *filePath = "ppu_open_bus";
+    // char *filePath = "01.basics";
+    // char *filePath = "02.alignment";
+    // char *filePath = "03.corners";
+    // char *filePath = "";
+    // char *filePath = "";
     // char *filePath = "";
     // char *filePath = "";
     // char *filePath = "";
