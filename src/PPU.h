@@ -78,7 +78,7 @@ typedef struct PPU
     uint8_t mask;
     uint8_t status;
     uint8_t oamAddr;
-    uint8_t oamCacheLen;
+    
     uint8_t dataBus;
 
     // Internal Registers
@@ -96,7 +96,15 @@ typedef struct PPU
     uint8_t bgNextTileHigh;
 
     OAM oam[OAM_SIZE];
-    uint8_t cacheOam[OAM_CACHE_SIZE];
+    
+    OAM secondaryOam[OAM_CACHE_SIZE];
+    uint8_t secondaryAddr;
+
+    //sprite evalution variables
+    uint8_t primaryCursor, secondaryCursor;
+    uint8_t sprM, sprN, sprTemp;
+    OAM tmpOAM;
+    uint8_t sprDone, sprHeight, sprCopying;
 
     uint8_t pattern_table[0x2000];
     uint8_t name_table[0x1000];

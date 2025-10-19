@@ -12,7 +12,7 @@ void PPU_init(PPU* ppu)
 
     ppu->scanLines = 0;
     ppu->pixels = 0;
-    ppu->oamCacheLen = 0;
+    ppu->secondaryAddr = 0;
     ppu->oddFrame = false;
     ppu->frameComple = false;
     ppu->nmi = false;
@@ -88,18 +88,118 @@ static void increment_y(PPU* ppu)
     }
 }
 
-static void evaluate_sprites(PPU* ppu, uint16_t scanline)
+static void evaluate_sprites(PPU* ppu)
 {
-    ppu->oamCacheLen = 0;
-    uint8_t len = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
-    
-    for(int i = 0; i < 64 && ppu->oamCacheLen < 8; i++)
+    uint16_t pixel = ppu->pixels;
+    uint16_t scanline = ppu->scanLines;
+
+    uint8_t sprHeight = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
+
+    if(pixel >=1 && pixel <=64)
     {
-        int16_t diff = scanline - ppu->oam[i].y;
-        if(diff >= 0 && diff < len) {
-            ppu->cacheOam[ppu->oamCacheLen++] = i;
+        if(pixel == 1) 
+        {
+            ppu->secondaryAddr = 0;
+        }
+        else if(pixel & 0x01 == 0)
+        {
+            ppu->secondaryAddr++;
+        }
+        else
+        {
+            switch(ppu->secondaryAddr & 0x3)
+            {
+                case 0:
+                    ppu->oam[ppu->secondaryAddr >> 2].y = 0xFF;
+                    break;
+                case 1:
+                    ppu->oam[ppu->secondaryAddr >> 2].idx = 0xFF;
+                    break;
+                case 2:
+                    ppu->oam[ppu->secondaryAddr >> 2].attr = 0xFF;
+                    break;
+                case 3:
+                    ppu->oam[ppu->secondaryAddr >> 2].x = 0xFF;
+                    break;
+            }
+        }
+        
+        if(pixel == 64)
+        {
+            ppu->secondaryAddr = 0;
+            ppu->primaryCursor = 0;
+            ppu->secondaryCursor = 0;
         }
     }
+    else if(pixel >= 65 && pixel <=256)
+    {
+        if(ppu->secondaryCursor == 8) return;
+        if(ppu->primaryCursor == 64)  return;
+
+        if (pixel & 0x01) {
+            ppu->tmpOAM = ppu->oam[ppu->primaryCursor];
+            if (ppu->sprM == 0) {
+                ppu->sprTemp = ppu->oam[ppu->sprN].y;
+            }
+        } else {
+            if (ppu->sprDone) {
+                if (ppu->sprN < 64 && ppu->sprM == 0) {
+                    int16_t diff = scanline - ppu->sprTemp;
+                    if (diff >= 0 && diff < sprHeight) {
+                        ppu->status |= STS_OVERFLOW;
+                        ppu->sprDone = true;
+                    }
+                    ppu->sprN++;
+                    ppu->sprM = (ppu->sprM + 1) & 3;
+                    if (ppu->sprM == 0) {
+                        ppu->sprN++;
+                    }
+                }
+            } else if (ppu->secondaryAddr < 8) {
+                if (!ppu->sprCopying) {
+                    int16_t diff = scanline - ppu->sprTemp;
+                    if (diff >= 0 && diff < sprHeight) {
+                        ppu->sprCopying = true;
+                        ppu->sprM = 0;
+                    } else {
+                        ppu->sprN++;
+                        if (ppu->sprN >= 64) {
+                            ppu->sprDone = true;
+                        }
+                    }
+                }
+                
+                if (ppu->sprCopying) {
+                    uint8_t* src_bytes = (uint8_t*)&ppu->oam[ppu->sprN];
+                    uint8_t* dst_bytes = (uint8_t*)&ppu->secondaryOam[ppu->secondaryAddr>>2];
+                    dst_bytes[ppu->sprM] = src_bytes[ppu->sprM];
+                    
+                    ppu->sprM++;
+                    
+                    if (ppu->sprM >= 4) {
+                        ppu->secondaryAddr += 4;
+                        ppu->sprCopying = false;
+                        ppu->sprM = 0;
+                        ppu->sprN++;
+                        
+                        if (ppu->sprN >= 64) {
+                            ppu->sprDone = true;
+                        }
+                        
+                        if (ppu->secondaryAddr >= 32) {
+                            ppu->sprDone = true;
+                        }
+                    }
+                }
+            } 
+            else 
+            {
+                ppu->sprDone = true;
+            }
+        }
+    }
+    uint8_t len = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
+    
 }
 
 static void load_bg_shifters(PPU* ppu)
@@ -132,16 +232,13 @@ void PPU_clock(PPU* ppu)
     uint16_t pixel = ppu->pixels;
     uint16_t scanline = ppu->scanLines;   
     
-    uint8_t pltAddr, pltAddrSp, ptrAddr;
+    uint8_t ptrAddr;
     uint8_t backPriority, len, attr;
-    uint8_t lowPltAddr, highPltAddr;
     uint16_t tileAddr, attrAddr, addr;
     
     if(scanline < VISIBLE_SCANLINES || scanline == ppu->scanLinesPerFame - 1)
     { // 0 - 239 and 261
-        if(pixel == 64) {
-            evaluate_sprites(ppu, scanline);
-        }
+        evaluate_sprites(ppu);
         if((pixel >= 1 && pixel <=256) || (pixel >= 321 && pixel <336))
         {
             update_shifters(ppu);
@@ -194,7 +291,6 @@ void PPU_clock(PPU* ppu)
 
     if(scanline < VISIBLE_SCANLINES)
     { // 0 - 239
-
         if(pixel >= 1 && pixel <= 256)
         {// Visible pixel rendering
             uint8_t bg_pixel = 0;
@@ -229,17 +325,28 @@ void PPU_clock(PPU* ppu)
                 {
                     uint8_t sprite_height = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
                     
-                    for(int i = 0; i < ppu->oamCacheLen; i++)
+                    for(int i = 0; i < ppu->secondaryAddr >> 2; i++)
                     {
-                        uint8_t oam_index = ppu->cacheOam[i];
-                        OAM* sprite = &ppu->oam[oam_index];
+                        OAM* sprite = &ppu->secondaryOam[i];
                         
-                        int16_t x_offset = (pixel - 1) - sprite->x;
-                        if(x_offset < 0 || x_offset >= 8)
+                        if (sprite->y == ppu->oam[0].y && 
+                            sprite->idx == ppu->oam[0].idx &&
+                            sprite->attr == ppu->oam[0].attr &&
+                            sprite->x == ppu->oam[0].x) 
+                        {
+                            is_sprite_0 = true;
+                        } 
+                        else 
+                        {
+                            is_sprite_0 = false;
+                        }
+
+
+                        int16_t x_offset = (pixel - 1) - sprite->x;                        
+                        if(x_offset < 0 || x_offset > 7)
                             continue;
                         
                         uint8_t y_offset = scanline - sprite->y;
-                        
                         if(sprite->attr & OAM_FLIP_Y)
                             y_offset = (sprite_height - 1) - y_offset;
                         
@@ -280,7 +387,6 @@ void PPU_clock(PPU* ppu)
                         
                         sprite_palette = (sprite->attr & 0x03) + 4;
                         sprite_has_priority = (sprite->attr & OAM_PRIORITY) == 0;
-                        is_sprite_0 = (oam_index == 0);
                         
                         break; 
                     }
