@@ -133,73 +133,111 @@ static void evaluate_sprites(PPU* ppu)
     }
     else if(pixel >= 65 && pixel <=256)
     {
-        if(ppu->secondaryCursor == 8) return;
-        if(ppu->primaryCursor == 64)  return;
-
         if (pixel & 0x01) {
             ppu->tmpOAM = ppu->oam[ppu->primaryCursor];
             if (ppu->sprM == 0) {
                 ppu->sprTemp = ppu->oam[ppu->sprN].y;
             }
-        } else {
+        } 
+        if (pixel >= 65 && pixel <= 256) 
+        {
+            if (pixel & 1) {
+                if (ppu->sprN < 64) {
+                    uint8_t* oam_ptr = (uint8_t*)&ppu->oam[ppu->sprN];
+                    ppu->sprTemp = oam_ptr[ppu->sprM];
+                } else {
+                    ppu->sprTemp = 0xFF;
+                }
+            }
+        }
+        // On even cycles: Process the read data
+        else 
+        {
+            // If we're done evaluating all sprites
             if (ppu->sprDone) {
-                if (ppu->sprN < 64 && ppu->sprM == 0) {
+                // Sprite overflow bug checking
+                if (ppu->sprN < 64) {
+                    // Check if current sprite is in range
                     int16_t diff = scanline - ppu->sprTemp;
+                    
                     if (diff >= 0 && diff < sprHeight) {
+                        // Sprite overflow detected
                         ppu->status |= STS_OVERFLOW;
-                        ppu->sprDone = true;
                     }
-                    ppu->sprN++;
-                    ppu->sprM = (ppu->sprM + 1) & 3;
+                    
+                    // Hardware bug: increment both n and m
+                    ppu->sprM++;
+                    if (ppu->sprM >= 4) {
+                        ppu->sprM = 0;
+                        ppu->sprN++;
+                    }
+                    
+                    // Also increment n (bug behavior)
                     if (ppu->sprM == 0) {
                         ppu->sprN++;
                     }
                 }
-            } else if (ppu->secondaryAddr < 8) {
-                if (!ppu->sprCopying) {
+            }
+            else if (ppu->secondaryAddr < 32) 
+            {
+                // Not currently copying a sprite
+                if (!ppu->sprCopying) 
+                {
+                    // Check if sprite Y is in range (m should be 0 here)
                     int16_t diff = scanline - ppu->sprTemp;
-                    if (diff >= 0 && diff < sprHeight) {
+                    
+                    if (diff >= 0 && diff < sprHeight) 
+                    {
+                        // Sprite is in range, start copying
                         ppu->sprCopying = true;
-                        ppu->sprM = 0;
-                    } else {
+                        
+                        // Write Y coordinate to secondary OAM
+                        ((uint8_t*)ppu->secondaryOam)[ppu->secondaryAddr] = ppu->sprTemp;
+                        ppu->secondaryAddr++;
+                        ppu->sprM = 1;
+                    } 
+                    else 
+                    {
+                        // Not in range, move to next sprite
                         ppu->sprN++;
+                        ppu->sprM = 0;
+                        
+                        // Check if we've evaluated all 64 sprites
                         if (ppu->sprN >= 64) {
                             ppu->sprDone = true;
                         }
                     }
                 }
-                
-                if (ppu->sprCopying) {
-                    uint8_t* src_bytes = (uint8_t*)&ppu->oam[ppu->sprN];
-                    uint8_t* dst_bytes = (uint8_t*)&ppu->secondaryOam[ppu->secondaryAddr>>2];
-                    dst_bytes[ppu->sprM] = src_bytes[ppu->sprM];
-                    
+                // Currently copying a sprite (m = 1, 2, or 3)
+                else 
+                {
+                    // Write byte to secondary OAM
+                    ((uint8_t*)ppu->secondaryOam)[ppu->secondaryAddr] = ppu->sprTemp;
+                    ppu->secondaryAddr++;
                     ppu->sprM++;
                     
+                    // Finished copying this sprite
                     if (ppu->sprM >= 4) {
-                        ppu->secondaryAddr += 4;
                         ppu->sprCopying = false;
                         ppu->sprM = 0;
                         ppu->sprN++;
                         
+                        // Check if we've evaluated all 64 sprites
                         if (ppu->sprN >= 64) {
                             ppu->sprDone = true;
                         }
                         
+                        // Check if secondary OAM is full (8 sprites found)
                         if (ppu->secondaryAddr >= 32) {
+                            // Switch to overflow checking mode
                             ppu->sprDone = true;
+                            ppu->sprM = 0;
                         }
                     }
                 }
-            } 
-            else 
-            {
-                ppu->sprDone = true;
             }
         }
     }
-    uint8_t len = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
-    
 }
 
 static void load_bg_shifters(PPU* ppu)
@@ -238,7 +276,6 @@ void PPU_clock(PPU* ppu)
     
     if(scanline < VISIBLE_SCANLINES || scanline == ppu->scanLinesPerFame - 1)
     { // 0 - 239 and 261
-        evaluate_sprites(ppu);
         if((pixel >= 1 && pixel <=256) || (pixel >= 321 && pixel <336))
         {
             update_shifters(ppu);
@@ -291,6 +328,7 @@ void PPU_clock(PPU* ppu)
 
     if(scanline < VISIBLE_SCANLINES)
     { // 0 - 239
+        evaluate_sprites(ppu);
         if(pixel >= 1 && pixel <= 256)
         {// Visible pixel rendering
             uint8_t bg_pixel = 0;
