@@ -79,15 +79,11 @@ void NES_start(NES* nes)
                     break;
                 case SDL_KEYDOWN:
                     key = NES_input_key(event.key.keysym.scancode);
-                    printf("down: %x\n", key);
                     nes->bus.controller[0]->status |= key;
-                    printf("states: %x\n", nes->bus.controller[0]->status);
                     break;
                 case SDL_KEYUP:
                     key = NES_input_key(event.key.keysym.scancode);
-                    printf("up: %x\n", key);
                     nes->bus.controller[0]->status &= ~key;
-                    printf("states: %x\n", nes->bus.controller[0]->status);
                     break;
             }
         }

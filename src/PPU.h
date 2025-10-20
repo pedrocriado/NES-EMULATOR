@@ -100,12 +100,6 @@ typedef struct PPU
     OAM secondaryOam[OAM_CACHE_SIZE];
     uint8_t secondaryAddr;
 
-    //sprite evalution variables
-    uint8_t primaryCursor, secondaryCursor;
-    uint8_t sprM, sprN, sprTemp;
-    OAM tmpOAM;
-    uint8_t sprDone, sprHeight, sprCopying;
-
     uint8_t pattern_table[0x2000];
     uint8_t name_table[0x1000];
     uint8_t palette[0x20];

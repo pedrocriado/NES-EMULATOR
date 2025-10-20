@@ -5,7 +5,7 @@
 
 #define PIXEL_WIDTH     256 
 #define PIXEL_HEIGHT    240
-#define PIXEL_SCALE     2
+#define PIXEL_SCALE     3
 
 typedef struct Graphics
 {
@@ -15,5 +15,5 @@ typedef struct Graphics
 } Graphics;
 
 void Graphics_init(Graphics* grap);
-void Graphics_render(Graphics* grap, uint32_t* screen); // <-- take pointer
+void Graphics_render(Graphics* grap, uint32_t* screen);
 void Graphics_free(Graphics* grap);

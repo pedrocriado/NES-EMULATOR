@@ -20,9 +20,9 @@ int main(int argc, char *argv[]) {
     // char *filePath = "01.basics";
     // char *filePath = "02.alignment";
     // char *filePath = "03.corners";
-    // char *filePath = "";
-    // char *filePath = "";
-    // char *filePath = "";
+    // char *filePath = "cpu_interrupts";
+    // char *filePath = "Baseball (VS) (Player 1 Mode) [a2]";
+    // char *filePath = "Donkey Kong Jr. (JU)";
     // char *filePath = "";
     // char *filePath = "";
     // char *filePath = "";
