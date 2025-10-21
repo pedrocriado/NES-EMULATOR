@@ -12,7 +12,11 @@ void CPU_init(struct CPU6502* cpu)
     cpu->a = cpu->x = cpu->y = 0x00;
     cpu->s = 0xFD;
 
-    cpu->nmi = false; cpu->irq = false;
+    cpu->nmi = false;
+    cpu->irq = false;
+    cpu->irqDisable = true;
+    cpu->irqDisableLatch = true;
+    cpu->irqDelay = 0;
 
     cpu->p = I;
 
@@ -48,9 +52,37 @@ void CPU_set_flag(CPU6502* cpu, Flags flag, bool value)
 
 void CPU_clock(CPU6502* cpu)
 {
-    
     if (cpu->ic.cycles == 0)
     {
+        if (cpu->nmi)
+        {
+            CPU_nmi(cpu);
+            cpu->nmi = false;
+            cpu->irqDisable = true;
+            cpu->irqDisableLatch = true;
+            cpu->irqDelay = 0;
+            return;
+        }
+
+        if (cpu->irq && !cpu->irqDisable)
+        {
+            CPU_irq(cpu);
+            cpu->irq = false;
+            cpu->irqDisable = true;
+            cpu->irqDisableLatch = true;
+            cpu->irqDelay = 0;
+            return;
+        }
+
+        if (cpu->irqDelay > 0)
+        {
+            cpu->irqDelay--;
+            if (cpu->irqDelay == 0)
+            {
+                cpu->irqDisable = cpu->irqDisableLatch;
+            }
+        }
+
         cpu->ic.opcode = Bus_read(cpu->bus, cpu->pc++);
 
         cpu->ic.cycles = lookup[cpu->ic.opcode].cycle_cnt;
@@ -58,7 +90,7 @@ void CPU_clock(CPU6502* cpu)
         uint8_t extra_cycles2 = lookup[cpu->ic.opcode].addrmode(cpu);
         uint8_t extra_cycles1 = lookup[cpu->ic.opcode].operate(cpu);
 
-        cpu->ic.cycles += extra_cycles1 & extra_cycles2;
+        cpu->ic.cycles += (extra_cycles1 & extra_cycles2);
     }
     cpu->ic.cycles--;
 }
@@ -66,15 +98,19 @@ void CPU_clock(CPU6502* cpu)
 void CPU_reset(CPU6502* cpu)
 {
     cpu->s -= 3;
-    //TODO cylces: add cycle-accurate IRQ timing.
-    //Note: The effect of changing this flag is delayed 1 instruction
-    cpu->p = cpu->p | I;
+    cpu->p |= I;
+
+    cpu->nmi = false;
+    cpu->irq = false;
+    cpu->irqDisable = true;
+    cpu->irqDisableLatch = true;
+    cpu->irqDelay = 0;
 
     uint8_t low = Bus_read(cpu->bus, 0xFFFC);
     uint8_t high = Bus_read(cpu->bus, 0xFFFD);
     cpu->pc = (high << 8) | low;
 
-    cpu->ic = (InstructionContext){0,0,0,0,7};
+    cpu->ic = (InstructionContext){0,0,0,0,0};
 }
 
 void CPU_irq(CPU6502* cpu)
@@ -87,6 +123,9 @@ void CPU_irq(CPU6502* cpu)
         CPU_set_flag(cpu, B, 0);
         CPU_set_flag(cpu, U, 1);
         CPU_set_flag(cpu, I, 1);
+        cpu->irqDisable = true;
+        cpu->irqDisableLatch = true;
+        cpu->irqDelay = 0;
 
         Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
@@ -107,6 +146,9 @@ void CPU_nmi(CPU6502* cpu)
     CPU_set_flag(cpu, B, 0);
     CPU_set_flag(cpu, U, 1);
     CPU_set_flag(cpu, I, 1);
+    cpu->irqDisable = true;
+    cpu->irqDisableLatch = true;
+    cpu->irqDelay = 0;
 
     Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
@@ -350,6 +392,9 @@ uint8_t BRK(CPU6502* cpu)
     Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
 
     CPU_set_flag(cpu, I, 1);
+    cpu->irqDisable = true;
+    cpu->irqDisableLatch = true;
+    cpu->irqDelay = 0;
     CPU_set_flag(cpu, B, 1);
 
     Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
@@ -382,9 +427,9 @@ uint8_t CLD(CPU6502* cpu)
 }
 uint8_t CLI(CPU6502* cpu)
 {
-    //TODO cylces: add cycle-accurate IRQ timing.
-    //Note: The effect of changing this flag is delayed 1 instruction
     CPU_set_flag(cpu, I, 0);
+    cpu->irqDisableLatch = false;
+    cpu->irqDelay = 1;
     return 0;
 }  
 uint8_t CLV(CPU6502* cpu)
@@ -663,9 +708,10 @@ uint8_t PLA(CPU6502* cpu)
 }	
 uint8_t PLP(CPU6502* cpu)
 {
-    //TODO cylces: add cycle-accurate IRQ timing.
-    //Note: The effect of changing this flag is delayed 1 instruction
-    cpu->p= Bus_read(cpu->bus, 0x0100 + ++cpu->s);
+    cpu->p = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
+    cpu->p |= U;
+    cpu->irqDisableLatch = CPU_get_flag(cpu, I);
+    cpu->irqDelay = 1;
 
     return 0;
 }
@@ -709,7 +755,9 @@ uint8_t RTI(CPU6502* cpu)
 {
     cpu->p = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
     cpu->p &= ~B;
-    cpu->p &= ~U;
+    cpu->p |= U;
+    cpu->irqDisableLatch = CPU_get_flag(cpu, I);
+    cpu->irqDelay = 1;
 
     uint16_t low = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
     uint16_t high = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
@@ -759,9 +807,9 @@ uint8_t SED(CPU6502* cpu)
 }	
 uint8_t SEI(CPU6502* cpu)
 {
-    //TODO cylces: add cycle-accurate IRQ timing.
-    //Note: The effect of changing this flag is delayed 1 instruction
     CPU_set_flag(cpu, I, 1);
+    cpu->irqDisableLatch = true;
+    cpu->irqDelay = 1;
 
     return 0;
 }

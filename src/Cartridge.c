@@ -233,36 +233,43 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     cart->mapper.hasPrgRam = cart->hasPrgRam;
     cart->mapper.hasChrRam = cart->hasChrRam;
     cart->mapper.hasPrgNvRam = cart->hasPrgNvRam;
+    cart->mapper.prgRom = cart->prgRom;
+    cart->mapper.chrRom = cart->chrRom;
 
     printf("[DEBUG] Mapper ID: %d\n", cart->mapperId);
 
     // Setting the mirror for the mapper
     switch (cart->mapper.mirror) {
         case HORIZONTAL:
+            printf("[DEBUG] Mirroring Horizontal\n");
             cart->mapper.name_table_map[0] = 0x2000;
             cart->mapper.name_table_map[1] = 0x2000;
             cart->mapper.name_table_map[2] = 0x2400;
             cart->mapper.name_table_map[3] = 0x2400;
             break;
         case VERTICAL:
+            printf("[DEBUG] Mirroring Vertical\n");    
             cart->mapper.name_table_map[0] = 0x2000;
             cart->mapper.name_table_map[1] = 0x2400;
             cart->mapper.name_table_map[2] = 0x2000;
             cart->mapper.name_table_map[3] = 0x2400;
             break;
         case ONE_SCREEN_LOWER:
+            printf("[DEBUG] Mirroring One Screen Lower\n");
             cart->mapper.name_table_map[0] = 0x2000;
             cart->mapper.name_table_map[1] = 0x2000;
             cart->mapper.name_table_map[2] = 0x2000;
             cart->mapper.name_table_map[3] = 0x2000;
             break;
         case ONE_SCREEN_UPPER:
+            printf("[DEBUG] Mirroring One Screen Upper\n");
             cart->mapper.name_table_map[0] = 0x2400;
             cart->mapper.name_table_map[1] = 0x2400;
             cart->mapper.name_table_map[2] = 0x2400;
             cart->mapper.name_table_map[3] = 0x2400;
             break;
         case FOUR_SCREEN:
+            printf("[DEBUG] Mirroring Four Screen\n");
             cart->mapper.name_table_map[0] = 0x2000;
             cart->mapper.name_table_map[1] = 0x2400;
             cart->mapper.name_table_map[2] = 0x2800;
@@ -270,6 +277,7 @@ void Cartridge_load(Cartridge* cart, char* fileName)
             break;
         default:
             // Default to horizontal if unsupported
+            printf("[DEBUG] Mirroring Horizontal\n");
             cart->mapper.name_table_map[0] = 0x2000;
             cart->mapper.name_table_map[1] = 0x2000;
             cart->mapper.name_table_map[2] = 0x2400;
@@ -287,7 +295,8 @@ void Cartridge_load(Cartridge* cart, char* fileName)
         //set_mapper1(mapper, cart);
         break;
     case UXROM:
-        //set_mapper2(mapper, cart);
+        set_mapper2(&cart->mapper, cart);
+        printf("[DEBUG] Mapper 2 (NxROM) initialized\n");
         break;
     case CNROM:
         //set_mapper3(mapper, cart);

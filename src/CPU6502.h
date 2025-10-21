@@ -30,6 +30,8 @@ struct Bus;
 
 typedef struct CPU6502
 {
+    struct Bus* bus;
+
     // Registers
     uint8_t a;		// Accumulator
     uint8_t x;		// X Register
@@ -43,9 +45,9 @@ typedef struct CPU6502
 
     // Interrupts
     bool nmi, irq;
-
-    // Connected Devices
-    struct Bus* bus;
+    bool irqDisable;
+    bool irqDisableLatch;
+    uint8_t irqDelay;
 } CPU6502;
 
 void CPU_init(struct CPU6502* cpu);
@@ -61,29 +63,6 @@ uint8_t CPU_get_flag(CPU6502* cpu, Flags flag);
 void CPU_set_flag(CPU6502* cpu, Flags flag, bool value);
 
 uint8_t CPU_fetch(CPU6502* cpu);
-
-
-
-// typedef enum {
-//     ADC, AND, ASL, BCC, BCS, 
-//     BEQ, BIT, BMI, BNE, BPL, 
-//     BRK, BVC, BVS, CLC, CLD, 
-//     CLI, CLV, CMP, CPX, CPY, 
-//     DEC, DEX, DEY, EOR, INC, 
-//     INX, INY, JMP, JSR, LDA, 
-//     LDX, LDY, LSR, NOP, ORA, 
-//     PHA, PHP, PLA, PLP, ROL, 
-//     ROR, RTI, RTS, SBC, SEC, 
-//     SED, SEI, STA, STX, STY, 
-//     TAX, TAY, TSX, TXA, TXS, 
-//     TYA, XXX  
-// } Opcode;
-//
-// typedef enum {
-//     IMP, IMM, ACC, ZP0, ZPX, 
-//     ZPY, IZX, IZY, ABS, ABX, 
-//     ABY, IND, REL 
-// } AddressMode;
 
 typedef struct INSTRUCTION {
     uint8_t (*operate)(CPU6502* cpu);
@@ -148,5 +127,5 @@ static const INSTRUCTION lookup[256] =
 	{ CPY, IMM, 2 },{ CMP, IZX, 6 },{ NOP, IMP, 2 },{ XXX, IMP, 8 },{ CPY, ZP0, 3 },{ CMP, ZP0, 3 },{ DEC, ZP0, 5 },{ XXX, IMP, 5 },{ INY, IMP, 2 },{ CMP, IMM, 2 },{ DEX, IMP, 2 },{ XXX, IMP, 2 },{ CPY, ABS, 4 },{ CMP, ABS, 4 },{ DEC, ABS, 6 },{ XXX, IMP, 6 },
 	{ BNE, REL, 2 },{ CMP, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ CMP, ZPX, 4 },{ DEC, ZPX, 6 },{ XXX, IMP, 6 },{ CLD, IMP, 2 },{ CMP, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ CMP, ABX, 4 },{ DEC, ABX, 7 },{ XXX, IMP, 7 },
 	{ CPX, IMM, 2 },{ SBC, IZX, 6 },{ NOP, IMP, 2 },{ XXX, IMP, 8 },{ CPX, ZP0, 3 },{ SBC, ZP0, 3 },{ INC, ZP0, 5 },{ XXX, IMP, 5 },{ INX, IMP, 2 },{ SBC, IMM, 2 },{ NOP, IMP, 2 },{ SBC, IMP, 2 },{ CPX, ABS, 4 },{ SBC, ABS, 4 },{ INC, ABS, 6 },{ XXX, IMP, 6 },
-	{ BEQ, REL, 2 },{ SBC, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ SBC, ZPX, 4 },{ INC, ZPX, 6 },{ XXX, IMP, 6 },{ SED, IMP, 2 },{ SBC, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ SBC, ABX, 4 },{ INC, ABX, 7 },{ XXX, IMP, 7 }
+	{ BEQ, REL, 2 },{ SBC, IZY, 5 },{ XXX, IMP, 2 },{ XXX, IMP, 8 },{ NOP, IMP, 4 },{ SBC, ZPX, 4 },{ INC, ZPX, 6 },{ XXX, IMP, 6 },{ SED, IMP, 2 },{ SBC, ABY, 4 },{ NOP, IMP, 2 },{ XXX, IMP, 7 },{ NOP, IMP, 4 },{ SBC, ABX, 4 },{ INC, ABX, 7 },{ XXX, IMP, 7 },
 };

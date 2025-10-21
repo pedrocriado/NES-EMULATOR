@@ -38,6 +38,11 @@ typedef struct Mapper
     uint16_t prgChunks;
     uint16_t chrChunks;
 
+    uint8_t* prgRom;
+    uint8_t* chrRom;
+
+    int clamp, prgPointerOffset;
+
     bool hasPrgRam;
     bool hasChrRam;
     bool hasPrgNvRam;

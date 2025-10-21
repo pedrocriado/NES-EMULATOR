@@ -80,6 +80,7 @@ typedef struct PPU
     uint8_t oamAddr;
     
     uint8_t dataBus;
+    uint8_t ioBus;
 
     // Internal Registers
     uint16_t v, t;
@@ -98,6 +99,7 @@ typedef struct PPU
     OAM oam[OAM_SIZE];
     
     OAM secondaryOam[OAM_CACHE_SIZE];
+    uint8_t secondaryOamIndex[OAM_CACHE_SIZE];
     uint8_t secondaryAddr;
 
     uint8_t pattern_table[0x2000];
@@ -112,6 +114,8 @@ typedef struct PPU
     bool oddFrame;
     bool frameComple;
     bool nmi;
+    bool nmiPending;
+    uint8_t nmiDelay;
 } PPU;
 
 void PPU_init(PPU* ppu);
