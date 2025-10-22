@@ -6,7 +6,7 @@
 #include "CPU6502.h"
 #include "PPU.h"
 
-void CPU_init(struct CPU6502* cpu)
+void CPU_init(CPU6502* cpu)
 {
     printf("[DEBUG] About to load NES CPU\n");
     cpu->a = cpu->x = cpu->y = 0x00;
@@ -28,6 +28,7 @@ void CPU_init(struct CPU6502* cpu)
     
     cpu->pc = (high << 8) | low;
     cpu->ic = (InstructionContext){0,0,0,0,0};
+    cpu->suppressNmiOnce = false;
 
     printf("[DEBUG] NES CPU loaded\n");
 }
@@ -54,7 +55,7 @@ void CPU_clock(CPU6502* cpu)
 {
     if (cpu->ic.cycles == 0)
     {
-        if (cpu->nmi)
+        if (!cpu->suppressNmiOnce && cpu->nmi)
         {
             CPU_nmi(cpu);
             cpu->nmi = false;
@@ -63,6 +64,7 @@ void CPU_clock(CPU6502* cpu)
             cpu->irqDelay = 0;
             return;
         }
+        cpu->suppressNmiOnce = false;
 
         if (cpu->irq && !cpu->irqDisable)
         {
@@ -111,6 +113,7 @@ void CPU_reset(CPU6502* cpu)
     cpu->pc = (high << 8) | low;
 
     cpu->ic = (InstructionContext){0,0,0,0,0};
+    cpu->suppressNmiOnce = false;
 }
 
 void CPU_irq(CPU6502* cpu)
@@ -401,7 +404,16 @@ uint8_t BRK(CPU6502* cpu)
 
     CPU_set_flag(cpu, B, 0);
 
-    cpu->pc = (Bus_read(cpu->bus, 0xFFFF) << 8) | Bus_read(cpu->bus, 0xFFFE);
+    if(cpu->nmi)
+    {
+        cpu->nmi = false;
+        cpu->pc = (Bus_read(cpu->bus, 0xFFFB) << 8) | Bus_read(cpu->bus, 0xFFFA);
+    }
+    else
+    {
+        cpu->pc = (Bus_read(cpu->bus, 0xFFFF) << 8) | Bus_read(cpu->bus, 0xFFFE);
+        cpu->suppressNmiOnce = true;
+    }
 
     return 0;
 }

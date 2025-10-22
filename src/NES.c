@@ -94,12 +94,12 @@ void NES_start(NES* nes)
             PPU_clock(&nes->ppu);
             PPU_clock(&nes->ppu);
             PPU_clock(&nes->ppu);
-            CPU_clock(&nes->cpu);
             if(nes->ppu.nmi)
             {
                 nes->ppu.nmi = false;
                 nes->cpu.nmi = true;
             }
+            CPU_clock(&nes->cpu);
         }     
         
         Graphics_render(&nes->graphics, nes->ppu.screen);

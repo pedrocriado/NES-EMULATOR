@@ -119,7 +119,8 @@ static void load_bg_shifters(PPU* ppu)
 
 static void update_shifters(PPU* ppu)
 {
-    if (ppu->mask & MSK_BG) {
+    if(ppu->mask & MSK_BG)
+    {
         ppu->bgShiftPtrLow <<= 1;
         ppu->bgShiftPtrHigh <<= 1;
         ppu->bgShiftAttrLow <<= 1;
@@ -166,7 +167,6 @@ void PPU_clock(PPU* ppu)
         if((pixel >= 2 && pixel < 258) || (pixel >= 321 && pixel < 338))
         {
             update_shifters(ppu);
-
             switch((pixel - 1) & 0x07)
             {
                 case 0:
@@ -254,13 +254,10 @@ void PPU_clock(PPU* ppu)
 
                         OAM sprite = ppu->secondaryOam[i];
 
-                        int16_t x_offset = (int16_t)(pixel - 1) - (int16_t)sprite.x;
+                        int16_t y_offset = scanline - (sprite.y + 1);
+                        int16_t x_offset = (pixel - 1) - sprite.x;
                         if(x_offset < 0 || x_offset >= 8)
                             continue;
-
-                        int16_t y_offset = (int16_t)scanline - ((int16_t)sprite.y + 1);
-                        // if(y_offset < 0 || y_offset >= len)
-                        //     continue;
 
                         uint8_t row = (uint8_t)y_offset;
                         uint8_t col = (uint8_t)x_offset;
@@ -305,7 +302,7 @@ void PPU_clock(PPU* ppu)
                         sprite_has_priority = (sprite.attr & OAM_PRIORITY) == 0;
                         
                         if((ppu->mask & MSK_BG) && !(ppu->status & STS_0_HIT) &&
-                           bg_pixel && pixel < 255 && spriteIndex == 0)
+                           bg_pixel && pixel < 256 && spriteIndex == 0)
                         {
                             ppu->status |= STS_0_HIT;
                         }
@@ -412,8 +409,7 @@ void PPU_clock(PPU* ppu)
                 for(int i = 0; i < 64; i++)
                 {
                     if(ppu->secondaryAddr == 8) break;
-                    uint8_t spriteY = (uint8_t)(ppu->oam[i].y + 1);
-                    int16_t diff = (int16_t)next_scanline - (int16_t)spriteY;
+                    int16_t diff = next_scanline - (ppu->oam[i].y + 1);
                     if(diff >= 0 && diff < len)
                     {
                         ppu->secondaryOam[ppu->secondaryAddr] = ppu->oam[i];
@@ -445,20 +441,21 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
     {
         case PPUCTRL:
         {
-            uint8_t previousCtrl = ppu->ctrl;
             ppu->ctrl = data;
             ppu->t &= ~(NAMETBL_X | NAMETBL_Y);
             ppu->t |= (ppu->ctrl & CTRL_NAMETABLE) << 10;
-            if (!(previousCtrl & CTRL_VBLANK) && (ppu->ctrl & CTRL_VBLANK) && (ppu->status & STS_VBLANK))
-            {
-                ppu->nmiPending = true;
-                ppu->nmiDelay = 6;
-            }
+            ppu->t &= 0x3FFF;
             if (!(ppu->ctrl & CTRL_VBLANK))
             {
                 ppu->nmiPending = false;
                 ppu->nmiDelay = 0;
             }
+            else if ((ppu->ctrl & CTRL_VBLANK) && (ppu->status & STS_VBLANK))
+            {
+                ppu->nmiPending = true;
+                ppu->nmiDelay = 6;
+            }
+            
             break;
         }
         case PPUMASK:
@@ -473,23 +470,13 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
         case OAMDATA:
             uint8_t oamIdx = ppu->oamAddr >> 2;
             
-            switch(ppu->oamAddr & 0x3)
+            switch(ppu->oamAddr++ & 0x3)
             {
-            case 0:
-                ppu->oam[oamIdx].y = data;
-                break;
-            case 1:
-                ppu->oam[oamIdx].idx = data;
-                break;
-            case 2:
-                ppu->oam[oamIdx].attr = data;
-                break;
-            case 3:
-                ppu->oam[oamIdx].x = data;
-                break;
+            case 0: ppu->oam[oamIdx].y = data; break;
+            case 1: ppu->oam[oamIdx].idx = data; break;
+            case 2: ppu->oam[oamIdx].attr = data; break;
+            case 3: ppu->oam[oamIdx].x = data; break;
             }
-
-            ppu->oamAddr++;
 
             break;
         case PPUSCROLL:
@@ -497,6 +484,7 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             {
                 ppu->t &= ~COARSE_X;
                 ppu->t |= (data >> 3) & 0x1F;
+                ppu->t &= 0x3FFF;
                 ppu->x = data & 0x07;
                 ppu->w = 1;
             }
@@ -505,18 +493,21 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
                 ppu->t &= ~(COARSE_Y | FINE_Y);
                 ppu->t |= (data << 5) & COARSE_Y;
                 ppu->t |= (data << 12) & FINE_Y;
+                ppu->t &= 0x3FFF;
                 ppu->w = 0;
             }
             break;
         case PPUADDR:
             if(!ppu->w)
             {
-                ppu->t = ((data & 0x3F) << 8) | (ppu->t & 0x00FF);
+                ppu->t = (ppu->t & 0x00FF) | ((uint16_t)(data & 0x3F) << 8);
+                ppu->t &= 0x3FFF;
                 ppu->w = 1;
             }
             else
             {
                 ppu->t = (ppu->t & 0xFF00) | data;
+                ppu->t &= 0x3FFF;
                 ppu->v = ppu->t;
                 ppu->w = 0;
             }

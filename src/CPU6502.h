@@ -48,9 +48,10 @@ typedef struct CPU6502
     bool irqDisable;
     bool irqDisableLatch;
     uint8_t irqDelay;
+    bool suppressNmiOnce;
 } CPU6502;
 
-void CPU_init(struct CPU6502* cpu);
+void CPU_init(CPU6502* cpu);
 void CPU_free(CPU6502* cpu);
 void CPU_clock(CPU6502* cpu);
 void CPU_reset(CPU6502* cpu);
