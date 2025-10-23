@@ -79,10 +79,11 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
                 bus->dataBus &= 0xE0;
                 bus->dataBus |= Controller_read(bus->controller[0]) & 0x01;
                 return bus->dataBus;
-            case JOY2:
-                bus->dataBus &= 0xE0;
-                bus->dataBus |= Controller_read(bus->controller[1]) & 0x01;
-                return bus->dataBus;
+            //Cause a bug that made SMB not run.
+            // case JOY2:
+            //     bus->dataBus &= 0xE0;
+            //     bus->dataBus |= Controller_read(bus->controller[1]) & 0x01;
+            //     return bus->dataBus;
         }
         return 0;
     }

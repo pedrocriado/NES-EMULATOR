@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <SDL.h>
 
 typedef enum ButtonFlags
 {
@@ -17,7 +18,7 @@ typedef enum ButtonFlags
 
 typedef struct JoyPad
 {
-    uint8_t status;
+    uint8_t state;
     uint8_t idx;
     bool strobe;
 } JoyPad;
@@ -25,3 +26,4 @@ typedef struct JoyPad
 void Controller_init(JoyPad* ctrl);
 void Controller_write(JoyPad* ctrl, uint8_t data);
 uint8_t Controller_read(JoyPad* ctrl);
+uint8_t Controller_input_key(SDL_Scancode key);

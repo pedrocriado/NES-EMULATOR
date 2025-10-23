@@ -1,9 +1,10 @@
-#include "NES.h"
-
 #include <SDL.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "NES.h"
+#include "Controller.h"
 
 static uint8_t NES_input_key(SDL_Scancode key);
 
@@ -78,12 +79,12 @@ void NES_start(NES* nes)
                     running = 0;
                     break;
                 case SDL_KEYDOWN:
-                    key = NES_input_key(event.key.keysym.scancode);
-                    nes->bus.controller[0]->status |= key;
+                    key = Controller_input_key(event.key.keysym.scancode);
+                    nes->bus.controller[0]->state |= key;
                     break;
                 case SDL_KEYUP:
-                    key = NES_input_key(event.key.keysym.scancode);
-                    nes->bus.controller[0]->status &= ~key;
+                    key = Controller_input_key(event.key.keysym.scancode);
+                    nes->bus.controller[0]->state &= ~key;
                     break;
             }
         }
@@ -116,28 +117,6 @@ void NES_start(NES* nes)
 
     NES_reset(nes);
     SDL_Quit();
-}
-
-static uint8_t NES_input_key(SDL_Scancode key)
-{
-    switch(key)
-    {
-        case SDL_SCANCODE_RIGHT: return 0x80;
-        case SDL_SCANCODE_LEFT:  return 0x40;
-        case SDL_SCANCODE_DOWN:  return 0x20;
-        case SDL_SCANCODE_UP:    return 0x10;
-        case SDL_SCANCODE_F:
-        case SDL_SCANCODE_RETURN:
-        case SDL_SCANCODE_SPACE:
-            return 0x08;
-        case SDL_SCANCODE_G:
-        case SDL_SCANCODE_RSHIFT:
-        case SDL_SCANCODE_TAB:
-            return 0x04;
-        case SDL_SCANCODE_X:     return 0x02;
-        case SDL_SCANCODE_Z:     return 0x01;
-        default:                 return 0x00;
-    }
 }
 
 void NES_reset(NES* nes)
