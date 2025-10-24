@@ -10,15 +10,15 @@ This README covers how to build and run it, what currently works, known limitati
 - Controller 1 (keyboard) supported
 - iNES/NES 2.0 headers parsed
 - Mappers: NROM (0) and UxROM (2) implemented; others stubbed
-- Battery‑backed save support for NES 2.0 PRG NVRAM
 - Windows native File → Open ROM menu
 
-Limitations (WIP):
+Limitations:
 
 - Audio (APU) not implemented yet
 - Only 1 controller mapped; JOY2 is disabled
 - Mapper coverage is limited (MMC1/3/5, CNROM not yet wired)
 - Non‑Windows builds do not have a native file dialog (use CLI)
+- Known visual bugs on a couple of games
 
 ## Build
 
@@ -42,7 +42,7 @@ cmake --build build
 
 The executable is created as:
 
-- Windows: `build/Release/nes.exe`
+- Windows: `build/Debug/nes.exe`
 
 SDL2 is fetched and built as part of the project; you don’t need to install it system‑wide.
 
@@ -52,10 +52,7 @@ You can pass a ROM path on the command line, or on Windows open it via the menu.
 
 ```bash
 # From the project root (example using a ROM inside nes_files)
-./build/nes ./nes_files/nestest.nes
-
-# Windows
-build/Release/nes.exe path\to\your\rom.nes
+./build/Debug/nes ./path/to/file/file.nes
 ```
 
 Windows also exposes a native File → Open ROM… menu. On macOS/Linux, use the CLI path argument for now.
@@ -83,7 +80,7 @@ Known good tests/games will be added over time. Expect many commercial games to 
 
 ## Screenshots
 
-Drop a few PNGs in a folder such as `docs/screenshots/` and reference them here. Examples:
+Below are some screenshots taken from the games running on the emulator:
 
 _Super Mario Bros._
 ![Super Mario Bros. – Title](docs/screenshots/smb_title_screen.png)
