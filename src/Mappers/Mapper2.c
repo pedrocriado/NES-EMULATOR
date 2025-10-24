@@ -22,12 +22,7 @@ void set_mapper2(Mapper* mapper, Cartridge* cart)
 
 static void prg_write(Mapper* mapper, uint16_t addr, uint8_t data)
 {
-    if(addr < 0x8000)
-        return;
-        
-    if(mapper->prgChunks == 0)
-        return;
-
+    if(addr < 0x8000) return;
     uint8_t bank = data % mapper->prgChunks;
     mapper->prgPointerOffset = bank * 0x4000;
 }
@@ -40,21 +35,16 @@ static void chr_write(Mapper* mapper, uint16_t addr, uint8_t data)
 
 static uint8_t prg_read(Mapper* mapper, uint16_t addr)
 {
-    if(addr < 0x8000)
-        return 0;
-
-    int prgAddr;
-
-    if(addr >= 0x8000 && addr <= 0xC000)
+    if(addr < 0x8000) return 0;
+    
+    if(addr >= 0x8000 && addr < 0xC000)
     {
-        prgAddr = mapper->prgPointerOffset + (addr - 0x8000);
+        return mapper->prgRom[mapper->prgPointerOffset + (addr - 0x8000)];
     }
     else
     {
-        prgAddr = mapper->clamp + (addr - 0xC000);
+        return mapper->prgRom[mapper->clamp + (addr - 0xC000)];
     }
-
-    return mapper->prgRom[prgAddr];
 }
 
 static uint8_t chr_read(Mapper* mapper, uint16_t addr)

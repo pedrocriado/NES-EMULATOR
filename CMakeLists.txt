@@ -35,4 +35,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL2)
 
 # Link SDL2 targets
-target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main  winmm)
+target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main winmm)
+
+if(WIN32)
+    target_link_libraries(nes PRIVATE comdlg32)
+endif()

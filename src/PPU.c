@@ -5,13 +5,6 @@
 #include "PPU.h"
 #include "CPU6502.h"
 
-static const uint8_t power_up_palette[0x20] = {
-    0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D,
-    0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
-    0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14,
-    0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08
-};
-
 void PPU_init(PPU* ppu)
 {
     ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
@@ -28,7 +21,6 @@ void PPU_init(PPU* ppu)
     ppu->ioBus = 0;
     memset(ppu->name_table, 0, sizeof(ppu->name_table));
     memset(ppu->palette, 0, sizeof(ppu->palette));
-    memcpy(ppu->palette, power_up_palette, sizeof(power_up_palette));
     memset(ppu->oam, 0xFF, sizeof(ppu->oam));
     memset(ppu->secondaryOam, 0xFF, sizeof(ppu->secondaryOam));
     memset(ppu->secondaryOamIndex, 0xFF, sizeof(ppu->secondaryOamIndex));

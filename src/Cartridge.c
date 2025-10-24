@@ -3,17 +3,13 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "Cartridge.h"
 #include "Mappers/Mapper.h"
 
-void Cartridge_load(Cartridge* cart, char* fileName)
+void Cartridge_load(Cartridge* cart, const char* fileName)
 {
-    if (!cart) {
-        printf("[ERROR] Cart is NULL\n");
-        exit(EXIT_FAILURE);
-    }
-
     printf("[DEBUG] Reseting Cartridge and Mapper data\n");
 
     Cartridge_reset(cart);
@@ -21,19 +17,23 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     printf("[DEBUG] Loading cartridge: %s\n", fileName);
 
     FILE* file;
-    
-    // Finding the path to the save file
-    snprintf(cart->nesFilePath, 
-             sizeof(cart->nesFilePath), 
-             "%s%s.nes", NES_FILE_PATH, fileName);
+    char finalPath[NES_PATH_MAX];
 
-    file = fopen(cart->nesFilePath, "rb");
+    strncpy(finalPath, fileName, sizeof(finalPath));
+    finalPath[sizeof(finalPath) - 1] = '\0';
+    
+    printf("[DEBUG] Rom path: %s\n", finalPath);
+
+    file = fopen(finalPath, "rb");
     if (file == NULL) {
         printf("[ERROR] Failed to open ROM file: %s (errno: %d - %s)\n", 
                cart->nesFilePath, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
     printf("[DEBUG] Successfully opened ROM file\n");   
+    strncpy(cart->nesFilePath, finalPath, sizeof(cart->nesFilePath));
+    cart->nesFilePath[sizeof(cart->nesFilePath) - 1] = '\0';
+    Cartridge_build_save_path(cart, finalPath, fileName);
     
     uint8_t header[INES_HEADER_SIZE];
     size_t res = fread(header, 1, INES_HEADER_SIZE, file);
@@ -44,7 +44,7 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     }
 
     // Check if the file format is iNES
-    if (!(header[0] == 'N' && 
+    if (!(header[0] =='N' && 
           header[1] == 'E' && 
           header[2] == 'S' && 
           header[3] == 0x1A))
@@ -195,9 +195,9 @@ void Cartridge_load(Cartridge* cart, char* fileName)
         {
             cart->prgNvRamChunks = (header[10]  >> 4);
             cart->prgNvRam = calloc(1, (64 << (header[10]  >> 4)));
-            snprintf(cart->savePath, 
-                    sizeof(cart->savePath), 
-                    "%s%s.sav", NES_SAVE_PATH, fileName);
+            if(!cart->savePath) {
+                Cartridge_build_save_path(cart, cart->nesFilePath, fileName);
+            }
             Cartridge_save_load(cart);
             cart->mapper.hasPrgNvRam = cart->hasPrgNvRam = true;
         }
@@ -310,6 +310,38 @@ void Cartridge_load(Cartridge* cart, char* fileName)
     }
     fclose(file);
     printf("[DEBUG] Cartridge loaded successfully\n");
+}
+
+bool Cartridge_has_nes_extension(const char* name)
+{
+    size_t len = name ? strlen(name) : 0;
+    if(len < 4) return false;
+    const char* file_type = name + len - 4;
+    return strcmp(file_type, ".nes");
+}
+
+void Cartridge_build_save_path(Cartridge* cart, const char* romPath, const char* fallbackName)
+{
+    const char* source = romPath && romPath[0] ? romPath : fallbackName;
+    if(!source || !cart) return;
+
+    const char* lastSlash = strrchr(source, '/');
+    const char* lastBack = strrchr(source, '\\');
+    const char* base = source;
+    if(lastSlash && lastSlash + 1 > base) base = lastSlash + 1;
+    if(lastBack && lastBack + 1 > base) base = lastBack + 1;
+
+    char nameBuffer[NES_PATH_MAX];
+    strncpy(nameBuffer, base, sizeof(nameBuffer));
+    nameBuffer[sizeof(nameBuffer) - 1] = '\0';
+
+    size_t len = strlen(nameBuffer);
+    if(Cartridge_has_nes_extension(nameBuffer)) {
+        len -= 4;
+        nameBuffer[len] = '\0';
+    }
+
+    snprintf(cart->savePath, sizeof(cart->savePath), "%s%s.sav", NES_SAVE_PATH, nameBuffer);
 }
 
 void Cartridge_save_load(Cartridge* cart)
