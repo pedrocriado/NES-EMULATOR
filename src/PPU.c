@@ -19,6 +19,7 @@ void PPU_init(PPU* ppu)
     ppu->nmiPending = false;
     ppu->nmiDelay = 0;
     ppu->ioBus = 0;
+    
     memset(ppu->name_table, 0, sizeof(ppu->name_table));
     memset(ppu->palette, 0, sizeof(ppu->palette));
     memset(ppu->oam, 0xFF, sizeof(ppu->oam));

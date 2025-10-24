@@ -40,17 +40,9 @@ cmake -S . -B build
 cmake --build build
 ```
 
-Windows (Visual Studio generator):
-
-```bash
-cmake -S . -B build -G "Visual Studio 17 2022"
-cmake --build build --config Release -j
-```
-
 The executable is created as:
 
 - Windows: `build/Release/nes.exe`
-- macOS/Linux: `build/nes` (or inside a config dir depending on the generator)
 
 SDL2 is fetched and built as part of the project; you don’t need to install it system‑wide.
 
@@ -91,12 +83,13 @@ Known good tests/games will be added over time. Expect many commercial games to 
 
 ## Screenshots
 
-Drop a few PNGs/GIFs in a folder such as `docs/screenshots/` and reference them here. Examples:
+Drop a few PNGs in a folder such as `docs/screenshots/` and reference them here. Examples:
 
-```markdown
-![Super Mario Bros. – Title](docs/screenshots/smb-title.png)
-![Castlevania – Gameplay](docs/screenshots/castlevania-1-1.gif)
-```
+_Super Mario Bros._
+![Super Mario Bros. – Title](docs/screenshots/smb_title_screen.png)
+
+_Castlevania_
+![Castlevania](docs/screenshots/Castlevania.png)
 
 ## Project Layout
 
@@ -104,23 +97,6 @@ Drop a few PNGs/GIFs in a folder such as `docs/screenshots/` and reference them 
 - `src/Mappers/` – Mapper implementations
 - `nes_files/` – Place your ROMs here (ignored in .git); saves in `nes_files/saves/`
 - `CMakeLists.txt` – Build configuration (FetchContent SDL2)
-
-## Name Ideas
-
-Here are some short, pronounceable options. Pick one you like or mix/modify:
-
-- Nessie — friendly, short, obvious NES nod
-- NEStalgia — classic pun; many emus riff on this
-- CriNES — a nod to “Criado” + NES
-- PedNES — author name blended in; unique
-- Nestling — “little NES”; evokes WIP/learning
-- NespressO — playful; NES + speed shot of espresso
-- NEXUS — NES + “hub/bridge”; modern feel
-- RedNES — color + console; simple
-- NESTro — “maestro”/“nostro” vibes; distinct
-- NEStro Pixel — retro‑pixel flavor
-
-If you want, I can update the README/title and window captions to your choice.
 
 ## Roadmap (WIP)
 

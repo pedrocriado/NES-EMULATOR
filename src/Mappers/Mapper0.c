@@ -22,7 +22,7 @@ void set_mapper0(Mapper* mapper, Cartridge* cart)
 
 static void prg_write(Mapper* mapper, uint16_t addr, uint8_t data)
 {
-    if(addr >= 0x6000 && addr < 0x8000)
+    if(addr >= 0x6000 && addr <= 0x7FFF)
     {
         if(mapper->hasPrgRam)
             mapper->cart->prgRam[addr - 0x6000] = data;
