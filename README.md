@@ -1,8 +1,8 @@
-# NES Emulator (Working Title)
+# HazardousNES
 
 A work‑in‑progress Nintendo Entertainment System emulator written in C, using SDL2 for graphics and input. The project focuses on correctness-first CPU/PPU emulation, a simple UI, and a clean CMake build that fetches SDL2 automatically.
 
-This README covers how to build and run it, what currently works, known limitations, and a few name ideas for the emulator. If you plan to showcase games running on it, there’s a screenshots section ready to drop images into.
+This README covers how to build and run it, what currently works, and known limitations,for the emulator.
 
 ## Status
 
@@ -40,10 +40,6 @@ cmake -S . -B build
 cmake --build build
 ```
 
-The executable is created as:
-
-- Windows: `build/Debug/nes.exe`
-
 SDL2 is fetched and built as part of the project; you don’t need to install it system‑wide.
 
 ## Run
@@ -57,7 +53,7 @@ You can pass a ROM path on the command line, or on Windows open it via the menu.
 
 Windows also exposes a native File → Open ROM… menu. On macOS/Linux, use the CLI path argument for now.
 
-ROMs are searched relative to `./nes_files/` when you provide a bare name without extension. Saves are written to `./nes_files/saves/` when the cartridge provides PRG NVRAM (NES 2.0).
+ROMs are searched relative to `./nes_files/` when you provide a bare name without extension.
 
 ## Controls
 

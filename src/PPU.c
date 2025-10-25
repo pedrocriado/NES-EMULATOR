@@ -13,7 +13,7 @@ void PPU_init(PPU* ppu)
     ppu->scanLines = 0;
     ppu->pixels = 0;
     ppu->secondaryAddr = 0;
-    ppu->oddFrame = false;
+    ppu->oddFrame = true;
     ppu->frameComple = false;
     ppu->nmi = false;
     ppu->nmiPending = false;
@@ -32,20 +32,26 @@ uint8_t PPU_read(PPU* ppu, uint16_t addr)
     addr &= 0x3FFF;
     uint8_t data = 0x00;
 
-    if (addr <= 0x1FFF) {
-        data = ppu->cart->mapper.chr_read(&ppu->cart->mapper, addr);
-    } else if (addr < 0x3F00) {
+    if (addr <= 0x1FFF) 
+    {
+        data = ppu->ioBus = ppu->cart->mapper.chr_read(&ppu->cart->mapper, addr);
+    } 
+    else if (addr < 0x3F00)
+    {
         addr &= 0x0FFF;
         uint16_t tableAddr = ppu->cart->mapper.name_table_map[addr / 0x0400];
-        data = ppu->name_table[(tableAddr - 0x2000) + (addr & 0x03FF)];
-    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+        data = ppu->ioBus = ppu->name_table[(tableAddr - 0x2000) + (addr & 0x03FF)];
+
+    } 
+    else if (addr >= 0x3F00 && addr <= 0x3FFF) 
+    {
         uint16_t paletteAddr = addr & 0x001F;
         if ((paletteAddr & 0x03) == 0 && (paletteAddr & 0x10))
             paletteAddr &= 0x000F;
         data = ppu->palette[paletteAddr & 0x001F] & 0x3F;
         data |= (ppu->ioBus & 0xC0);
     }
-    ppu->ioBus = data;
+    
     return data;
 }
 
@@ -96,6 +102,40 @@ static void increment_y(PPU* ppu)
         }
         ppu->v = (ppu->v & ~COARSE_Y) | (y << 5);
     }
+}
+
+static uint8_t oamRead(PPU* ppu)
+{
+    uint8_t data;
+    uint8_t oamIdx = ppu->oamAddr >> 2;
+    switch(ppu->oamAddr & 0x3)
+    {
+        case 0: data = ppu->oam[oamIdx].y;    break;
+        case 1: data = ppu->oam[oamIdx].idx;  break;
+        case 2: data = ppu->oam[oamIdx].attr; break;
+        case 3: data = ppu->oam[oamIdx].x;    break;
+    }
+
+    if(ppu->mask & MSK_SHOW_ALL && ppu->scanLines < 240)
+    {
+        if(ppu->pixels > 0 && ppu->pixels <= 64)
+        {
+            return 0xFF;
+        }
+        else if(ppu->pixels <= 256)
+        {
+            return data;
+        }
+        else if(ppu->pixels <= 320)
+        {
+            return 0xFF;
+        }
+        else
+        {
+            return data;
+        }
+    }
+    return data;
 }
 
 static void load_bg_shifters(PPU* ppu)
@@ -202,6 +242,37 @@ void PPU_clock(PPU* ppu)
                     if(ppu->mask & MSK_SHOW_ALL)
                         increment_coarse_x(ppu);
                     break;
+            }
+        }
+        
+        if(pixel == 256)
+            if(ppu->mask & MSK_SHOW_ALL)
+                increment_y(ppu);
+
+        if(pixel == 257)
+            if(ppu->mask & MSK_SHOW_ALL)
+                ppu->v = (ppu->v & 0x7BE0) | (ppu->t & 0x041F);
+        
+        if(pixel == 320)
+        {
+            if(ppu->mask & MSK_SHOW_ALL)
+            {
+                memset(ppu->secondaryOam, 0xFF, sizeof(ppu->secondaryOam));
+                memset(ppu->secondaryOamIndex, 0xFF, sizeof(ppu->secondaryOamIndex));
+                ppu->secondaryAddr = 0;
+                uint8_t len = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
+                uint16_t next_scanline = (scanline + 1) % ppu->scanLinesPerFame;
+                for(int i = 0; i < 64; i++)
+                {
+                    if(ppu->secondaryAddr == 8) break;
+                    int16_t diff = next_scanline - (ppu->oam[i].y + 1);
+                    if(diff >= 0 && diff < len)
+                    {
+                        ppu->secondaryOam[ppu->secondaryAddr] = ppu->oam[i];
+                        ppu->secondaryOamIndex[ppu->secondaryAddr] = i;
+                        ppu->secondaryAddr++;
+                    }
+                }
             }
         }
     }
@@ -339,15 +410,6 @@ void PPU_clock(PPU* ppu)
             uint8_t color = ppu->palette[palette_addr] & 0x3F;
             ppu->screen[(scanline * PPU_SCANLINE) + (pixel - 1)] = nes_palette[color];
         }
-
-        if(pixel == 256)
-            if(ppu->mask & MSK_SHOW_ALL)
-                increment_y(ppu);
-
-        if(pixel == 257)
-            if(ppu->mask & MSK_SHOW_ALL)
-                ppu->v = (ppu->v & 0x7BE0) | (ppu->t & 0x041F);
-
     }
     else if(scanline < ppu->scanLinesPerFame - 1)
     { // 241 - 260/310
@@ -370,13 +432,6 @@ void PPU_clock(PPU* ppu)
             ppu->nmiPending = false;
             ppu->nmiDelay = 0;
         }
-        if(pixel == 256)
-            if(ppu->mask & MSK_SHOW_ALL)
-                increment_y(ppu);
-
-        if(pixel == 257)
-            if(ppu->mask & MSK_SHOW_ALL)
-                ppu->v = (ppu->v & 0x7BE0) | (ppu->t & 0x041F);
 
         if(pixel >= 280 && pixel <= 304)
             if (ppu->mask & MSK_SHOW_ALL)
@@ -385,32 +440,6 @@ void PPU_clock(PPU* ppu)
         if(pixel == 339 && ppu->oddFrame && (ppu->mask & MSK_SHOW_ALL)) 
         { 
             ppu->pixels++;
-        }
-    }
-
-    if((scanline < VISIBLE_SCANLINES) || (scanline == ppu->scanLinesPerFame - 1))
-    {
-        if(pixel == 320)
-        {
-            if(ppu->mask & MSK_SHOW_ALL)
-            {
-                memset(ppu->secondaryOam, 0xFF, sizeof(ppu->secondaryOam));
-                memset(ppu->secondaryOamIndex, 0xFF, sizeof(ppu->secondaryOamIndex));
-                ppu->secondaryAddr = 0;
-                uint8_t len = (ppu->ctrl & CTRL_SPR_SIZE) ? 16 : 8;
-                uint16_t next_scanline = (scanline + 1) % ppu->scanLinesPerFame;
-                for(int i = 0; i < 64; i++)
-                {
-                    if(ppu->secondaryAddr == 8) break;
-                    int16_t diff = next_scanline - (ppu->oam[i].y + 1);
-                    if(diff >= 0 && diff < len)
-                    {
-                        ppu->secondaryOam[ppu->secondaryAddr] = ppu->oam[i];
-                        ppu->secondaryOamIndex[ppu->secondaryAddr] = i;
-                        ppu->secondaryAddr++;
-                    }
-                }
-            }
         }
     }
 
@@ -437,7 +466,6 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             ppu->ctrl = data;
             ppu->t &= ~(NAMETBL_X | NAMETBL_Y);
             ppu->t |= (ppu->ctrl & CTRL_NAMETABLE) << 10;
-            ppu->t &= 0x3FFF;
             if (!(ppu->ctrl & CTRL_VBLANK))
             {
                 ppu->nmiPending = false;
@@ -465,10 +493,10 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             
             switch(ppu->oamAddr++ & 0x3)
             {
-            case 0: ppu->oam[oamIdx].y = data; break;
-            case 1: ppu->oam[oamIdx].idx = data; break;
+            case 0: ppu->oam[oamIdx].y    = data; break;
+            case 1: ppu->oam[oamIdx].idx  = data; break;
             case 2: ppu->oam[oamIdx].attr = data; break;
-            case 3: ppu->oam[oamIdx].x = data; break;
+            case 3: ppu->oam[oamIdx].x    = data; break;
             }
 
             break;
@@ -477,7 +505,6 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             {
                 ppu->t &= ~COARSE_X;
                 ppu->t |= (data >> 3) & 0x1F;
-                ppu->t &= 0x3FFF;
                 ppu->x = data & 0x07;
                 ppu->w = 1;
             }
@@ -486,21 +513,18 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
                 ppu->t &= ~(COARSE_Y | FINE_Y);
                 ppu->t |= (data << 5) & COARSE_Y;
                 ppu->t |= (data << 12) & FINE_Y;
-                ppu->t &= 0x3FFF;
                 ppu->w = 0;
             }
             break;
         case PPUADDR:
             if(!ppu->w)
             {
-                ppu->t = (ppu->t & 0x00FF) | ((uint16_t)(data & 0x3F) << 8);
-                ppu->t &= 0x3FFF;
+                ppu->t = (ppu->t & 0x00FF) | ((data & 0x3F) << 8);
                 ppu->w = 1;
             }
             else
             {
                 ppu->t = (ppu->t & 0xFF00) | data;
-                ppu->t &= 0x3FFF;
                 ppu->v = ppu->t;
                 ppu->w = 0;
             }
@@ -520,26 +544,21 @@ uint8_t PPU_get_register(PPU* ppu, uint16_t addr)
     switch(addr)
     {
         case PPUSTATUS:
-            data = (ppu->status & 0xE0);
-            data |= (ppu->dataBus & 0x1F);
+            ppu->ioBus = (ppu->status & 0xE0);
+            ppu->ioBus |= (ppu->dataBus & 0x1F);
             ppu->status &= ~STS_VBLANK;
             ppu->nmiPending = false;
             ppu->nmiDelay = 0;
             ppu->w = 0;
-            ppu->ioBus = data;
-            return data;
+            ppu->dataBus = ppu->ioBus;
+            return ppu->ioBus;
         case OAMDATA:
         {
-            uint8_t oamIdx = ppu->oamAddr >> 2;
-            switch(ppu->oamAddr & 0x3)
-            {
-            case 0: data = ppu->oam[oamIdx].y; break;
-            case 1: data = ppu->oam[oamIdx].idx; break;
-            case 2: data = ppu->oam[oamIdx].attr; break;
-            case 3: data = ppu->oam[oamIdx].x; break;
-            }
-            ppu->ioBus = data;
-            return data;
+            ppu->ioBus = oamRead(ppu);
+            //When OAM attribute is read bits 2,3 and 4 are always set to 0;
+            if((ppu->oamAddr & 0x03) == 2)
+                ppu->ioBus &= 0xE3;
+            return ppu->ioBus;
         }
         case PPUDATA:
         {

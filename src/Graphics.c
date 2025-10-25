@@ -28,7 +28,7 @@ void Graphics_init(Graphics* grap)
 
     // Create a window
     grap->window = SDL_CreateWindow(
-        "NES Emulator Test",
+        "NES Emulator",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         PIXEL_WIDTH * PIXEL_SCALE,
@@ -85,10 +85,9 @@ bool Graphics_prompt_rom_selection(Graphics* grap, char* outPath, size_t outSize
     if(!outPath || outSize == 0)
         return false;
 
-#ifdef _WIN32
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version);
-    HWND owner = NULL;
+    HWND owner;
     if(SDL_GetWindowWMInfo(grap->window, &wmInfo)) {
         owner = wmInfo.info.win.window;
     }
@@ -110,7 +109,6 @@ bool Graphics_prompt_rom_selection(Graphics* grap, char* outPath, size_t outSize
         return true;
     }
     return false;
-#endif
 }
 
 static void Graphics_windows_menu(Graphics* grap)
