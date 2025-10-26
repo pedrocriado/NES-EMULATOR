@@ -99,10 +99,9 @@ void NES_start(NES* nes)
                 PPU_clock(&nes->ppu);
                 PPU_clock(&nes->ppu);
                 PPU_clock(&nes->ppu);
-                if(nes->ppu.nmi) {
-                    nes->ppu.nmi = false;
-                    nes->cpu.nmi = true;
-                }
+                // Sample the actual PPU NMI line (asserted after the PPU delay),
+                // not the internal 'nmiPending' flag which is a scheduling helper.
+                nes->cpu.nmiLine = nes->ppu.nmi;
                 CPU_clock(&nes->cpu);
                 
             }
@@ -219,8 +218,6 @@ static const char* NES_extract_basename(const char* path, char* buffer, size_t b
 
 static void NES_update_window_title(NES* nes)
 {
-    if(!nes) return;
-
     char title[512];
     if(nes->cartLoaded && nes->currentRomName[0] != '\0') {
         snprintf(title, sizeof(title), "NES Emulator - %s", nes->currentRomName);
@@ -232,16 +229,14 @@ static void NES_update_window_title(NES* nes)
 
 static bool NES_load_cartridge(NES* nes, const char* romPath)
 {
-    if(!nes || !romPath || romPath[0] == '\0')
+    if(!romPath || romPath[0] == '\0')
         return false;
 
     printf("[DEBUG] Loading ROM: %s\n", romPath);
 
     NES_reset_runtime_state(nes);
-
-    if(nes->ppu.screen) {
-        PPU_free(&nes->ppu);
-    }
+    
+    PPU_free(&nes->ppu);
 
     Cartridge_load(&nes->cart, romPath);
 

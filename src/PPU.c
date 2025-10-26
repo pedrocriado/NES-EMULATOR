@@ -152,7 +152,7 @@ static void load_bg_shifters(PPU* ppu)
 
 static void update_shifters(PPU* ppu)
 {
-    if(ppu->mask & MSK_BG)
+    if(ppu->mask & MSK_SHOW_ALL)
     {
         ppu->bgShiftPtrLow <<= 1;
         ppu->bgShiftPtrHigh <<= 1;
@@ -463,13 +463,14 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
     {
         case PPUCTRL:
         {
-            ppu->ctrl = data;
+            ppu->ctrl = ppu->dataBus = data;
             ppu->t &= ~(NAMETBL_X | NAMETBL_Y);
             ppu->t |= (ppu->ctrl & CTRL_NAMETABLE) << 10;
             if (!(ppu->ctrl & CTRL_VBLANK))
             {
                 ppu->nmiPending = false;
                 ppu->nmiDelay = 0;
+                ppu->nmi = false;
             }
             else if ((ppu->ctrl & CTRL_VBLANK) && (ppu->status & STS_VBLANK))
             {
@@ -549,6 +550,7 @@ uint8_t PPU_get_register(PPU* ppu, uint16_t addr)
             ppu->status &= ~STS_VBLANK;
             ppu->nmiPending = false;
             ppu->nmiDelay = 0;
+            ppu->nmi = false;
             ppu->w = 0;
             ppu->dataBus = ppu->ioBus;
             return ppu->ioBus;

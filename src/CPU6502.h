@@ -8,14 +8,14 @@
 
 typedef enum Flags
 {
-    C = (1 << 0),	// Carry Bit
-    Z = (1 << 1),	// Zero
-    I = (1 << 2),	// Disable Interrupts
-    D = (1 << 3),	// Decimal Mode
-    B = (1 << 4),	// Break
-    U = (1 << 5),	// Unused
-    V = (1 << 6),	// Overflow
-    N = (1 << 7),	// Negative
+    C = 0x01,	// Carry Bit
+    Z = 0x02,	// Zero
+    I = 0x04,	// Disable Interrupts
+    D = 0x08,	// Decimal Mode
+    B = 0x10,	// Break
+    U = 0x20,	// Unused
+    V = 0x40,	// Overflow
+    N = 0x80,	// Negative
 } Flags;
 
 typedef struct InstructionContext{
@@ -44,9 +44,12 @@ typedef struct CPU6502
     InstructionContext ic;
 
     // Interrupts
-    bool nmi, irq;
+    bool nmi, irq, reset, brk;
+    bool nmiLine;
+    bool nmiEdge;
+    bool nmiPrevious;
     bool irqDisable;
-    bool irqDisableLatch;
+    bool suppressInterrupt;
     uint8_t irqDelay;
     bool suppressNmiOnce;
 } CPU6502;
@@ -57,6 +60,8 @@ void CPU_clock(CPU6502* cpu);
 void CPU_reset(CPU6502* cpu);
 void CPU_irq(CPU6502* cpu);
 void CPU_nmi(CPU6502* cpu);
+void CPU_poll_interrupt(CPU6502* cpu);
+void CPU_poll_interrupt_cant_disable(CPU6502* cpu);
 
 void CPU_branch_helper(CPU6502* cpu, bool condition);
 

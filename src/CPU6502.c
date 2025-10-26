@@ -6,19 +6,24 @@
 #include "CPU6502.h"
 #include "PPU.h"
 
+static void CPU_post_instruction_poll(CPU6502* cpu, uint8_t opcode);
+
 void CPU_init(CPU6502* cpu)
 {
     printf("[DEBUG] About to load NES CPU\n");
     cpu->a = cpu->x = cpu->y = 0x00;
     cpu->s = 0xFD;
 
+    // Initialize interrupt state
     cpu->nmi = false;
     cpu->irq = false;
+    cpu->nmiLine = false;
+    cpu->nmiEdge = false;
+    cpu->nmiPrevious = false;
     cpu->irqDisable = true;
-    cpu->irqDisableLatch = true;
     cpu->irqDelay = 0;
 
-    cpu->p = I;
+    CPU_set_flag(cpu, I, 1);
 
     //TODO cylces: add cycle-accurate IRQ timing.
     //Note: The effect of changing this flag is delayed 1 instruction
@@ -55,44 +60,56 @@ void CPU_clock(CPU6502* cpu)
 {
     if (cpu->ic.cycles == 0)
     {
-        if (!cpu->suppressNmiOnce && cpu->nmi)
-        {
-            CPU_nmi(cpu);
-            cpu->nmi = false;
-            cpu->irqDisable = true;
-            cpu->irqDisableLatch = true;
-            cpu->irqDelay = 0;
-            return;
+        // Detect NMI edge first
+        if (cpu->nmiLine && !cpu->nmiPrevious && !cpu->suppressNmiOnce) {
+            cpu->nmiEdge = true;
         }
-        cpu->suppressNmiOnce = false;
+        cpu->nmiPrevious = cpu->nmiLine;
 
-        if (cpu->irq && !cpu->irqDisable)
+        // Check for interrupts before fetching next instruction
+        if (!cpu->suppressInterrupt)
         {
-            CPU_irq(cpu);
-            cpu->irq = false;
-            cpu->irqDisable = true;
-            cpu->irqDisableLatch = true;
-            cpu->irqDelay = 0;
-            return;
-        }
-
-        if (cpu->irqDelay > 0)
-        {
-            cpu->irqDelay--;
-            if (cpu->irqDelay == 0)
+            if (cpu->nmiEdge)
             {
-                cpu->irqDisable = cpu->irqDisableLatch;
+                cpu->nmi = true;
+                cpu->nmiEdge = false;
+                cpu->suppressNmiOnce = true;
+                CPU_nmi(cpu);
+                return;
+            }
+            else if (cpu->irq && !CPU_get_flag(cpu, I))
+            {
+                CPU_irq(cpu);
+                return;
+            }
+            else if (cpu->reset)
+            {
+                CPU_reset(cpu);
+                return;
             }
         }
 
-        cpu->ic.opcode = Bus_read(cpu->bus, cpu->pc++);
-
+        // Fetch and execute next instruction
+        cpu->ic.opcode = Bus_read(cpu->bus, cpu->pc);
         cpu->ic.cycles = lookup[cpu->ic.opcode].cycle_cnt;
-
+        
+        // Handle BRK instruction
+        if (cpu->ic.opcode == 0) {
+            if (!cpu->suppressInterrupt) {
+                cpu->brk = true;
+            }
+        }
+        
+        cpu->pc++;
+        
         uint8_t extra_cycles2 = lookup[cpu->ic.opcode].addrmode(cpu);
         uint8_t extra_cycles1 = lookup[cpu->ic.opcode].operate(cpu);
 
+        CPU_post_instruction_poll(cpu, cpu->ic.opcode);
+
         cpu->ic.cycles += (extra_cycles1 & extra_cycles2);
+
+        cpu->suppressInterrupt = false;
     }
     cpu->ic.cycles--;
 }
@@ -104,8 +121,8 @@ void CPU_reset(CPU6502* cpu)
 
     cpu->nmi = false;
     cpu->irq = false;
+    cpu->nmiLine = false;
     cpu->irqDisable = true;
-    cpu->irqDisableLatch = true;
     cpu->irqDelay = 0;
 
     uint8_t low = Bus_read(cpu->bus, 0xFFFC);
@@ -114,6 +131,47 @@ void CPU_reset(CPU6502* cpu)
 
     cpu->ic = (InstructionContext){0,0,0,0,0};
     cpu->suppressNmiOnce = false;
+}
+
+void CPU_poll_interrupt(CPU6502* cpu)
+{
+    if (!cpu->nmiLine) {
+        cpu->suppressNmiOnce = false;
+    }
+    
+    if (!CPU_get_flag(cpu, I)) {
+        cpu->irq = true;
+    }
+}
+
+void CPU_poll_interrupt_cant_disable(CPU6502* cpu)
+{
+    if(cpu->nmiLine)
+        cpu->nmi = true;
+
+    if(!cpu->irq)
+        cpu->irq = !CPU_get_flag(cpu, I);
+}
+
+static void CPU_post_instruction_poll(CPU6502* cpu, uint8_t opcode)
+{
+    switch(opcode)
+    {
+        case 0x00: // BRK handles polling internally
+        case 0x10: // BPL
+        case 0x30: // BMI
+        case 0x50: // BVC
+        case 0x70: // BVS
+        case 0x90: // BCC
+        case 0xB0: // BCS
+        case 0xD0: // BNE
+        case 0xF0: // BEQ
+            // Branch helper performs the appropriate polling behaviour
+            break;
+        default:
+            CPU_poll_interrupt(cpu);
+            break;
+    }
 }
 
 void CPU_irq(CPU6502* cpu)
@@ -127,7 +185,6 @@ void CPU_irq(CPU6502* cpu)
         CPU_set_flag(cpu, U, 1);
         CPU_set_flag(cpu, I, 1);
         cpu->irqDisable = true;
-        cpu->irqDisableLatch = true;
         cpu->irqDelay = 0;
 
         Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
@@ -148,19 +205,18 @@ void CPU_nmi(CPU6502* cpu)
 
     CPU_set_flag(cpu, B, 0);
     CPU_set_flag(cpu, U, 1);
+    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
+
     CPU_set_flag(cpu, I, 1);
     cpu->irqDisable = true;
-    cpu->irqDisableLatch = true;
     cpu->irqDelay = 0;
-
-    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
 
     uint16_t low = Bus_read(cpu->bus, 0xFFFA);
     uint16_t high = Bus_read(cpu->bus, 0xFFFB);
-
     cpu->pc = (high << 8) | low;
 
-    cpu->ic.cycles = 8;
+    cpu->ic.cycles = 7;
+    cpu->suppressNmiOnce = true;
 }
 
 uint8_t CPU_fetch(CPU6502* cpu)
@@ -278,16 +334,26 @@ uint8_t REL(CPU6502* cpu)
 }	
 
 // Helper functions
-void CPU_branch_helper(CPU6502* cpu, bool condition) {
-    if (condition) {
+void CPU_branch_helper(CPU6502* cpu, bool condition)
+{
+    CPU_poll_interrupt(cpu);
+
+    if (condition)
+    {
         cpu->ic.cycles++;
 
-        cpu->ic.addr_abs = cpu->pc + cpu->ic.addr_rel;
+        uint16_t target = cpu->pc + cpu->ic.addr_rel;
+        bool page_cross = (target & 0xFF00) != (cpu->pc & 0xFF00);
 
-        if ((cpu->ic.addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+        cpu->ic.addr_abs = target;
+
+        if (page_cross)
+        {
             cpu->ic.cycles++;
+            CPU_poll_interrupt_cant_disable(cpu);
+        }
 
-        cpu->pc = cpu->ic.addr_abs;
+        cpu->pc = target;
     }
 }
 
@@ -390,30 +456,45 @@ uint8_t BPL(CPU6502* cpu)
 }	
 uint8_t BRK(CPU6502* cpu)
 {
-    cpu->pc++;
-    Bus_write(cpu->bus, 0x0100 + cpu->s--, (cpu->pc >> 8) & 0x00FF);
-    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->pc & 0x00FF);
+    if(cpu->brk)
+    {
+        IMM(cpu);
+    }
 
-    CPU_set_flag(cpu, I, 1);
-    cpu->irqDisable = true;
-    cpu->irqDisableLatch = true;
-    cpu->irqDelay = 0;
-    CPU_set_flag(cpu, B, 1);
+    if(cpu->reset)
+    {
+        Bus_read(cpu->bus, 0x100 + cpu->s--);
+        Bus_read(cpu->bus, 0x100 + cpu->s--);
+        Bus_read(cpu->bus, 0x100 + cpu->s--);
+    }
+    else
+    {
+        Bus_write(cpu->bus, 0x100 + cpu->s--, cpu->pc >> 8);
+        Bus_write(cpu->bus, 0x100 + cpu->s--, cpu->pc & 0x00FF);
+        CPU_set_flag(cpu, B, cpu->brk);
+        CPU_set_flag(cpu, U, 1);
+        Bus_write(cpu->bus, 0x100 + cpu->s--, cpu->p);
+    }
 
-    Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p);
-
-    CPU_set_flag(cpu, B, 0);
+    CPU_poll_interrupt(cpu);
 
     if(cpu->nmi)
     {
-        cpu->nmi = false;
         cpu->pc = (Bus_read(cpu->bus, 0xFFFB) << 8) | Bus_read(cpu->bus, 0xFFFA);
+    }
+    else if(cpu->reset)
+    {
+        cpu->pc = (Bus_read(cpu->bus, 0xFFFD) << 8) | Bus_read(cpu->bus, 0xFFFC);
     }
     else
     {
         cpu->pc = (Bus_read(cpu->bus, 0xFFFF) << 8) | Bus_read(cpu->bus, 0xFFFE);
-        cpu->suppressNmiOnce = true;
     }
+    
+    cpu->nmi = cpu->irq = cpu->reset = false;
+    cpu->suppressInterrupt = true;
+
+    CPU_set_flag(cpu, I, 1);
 
     return 0;
 }
@@ -440,7 +521,6 @@ uint8_t CLD(CPU6502* cpu)
 uint8_t CLI(CPU6502* cpu)
 {
     CPU_set_flag(cpu, I, 0);
-    cpu->irqDisableLatch = false;
     cpu->irqDelay = 1;
     return 0;
 }  
@@ -705,6 +785,7 @@ uint8_t PHP(CPU6502* cpu)
     Bus_write(cpu->bus, 0x0100 + cpu->s--, cpu->p | B | U);
 
     CPU_set_flag(cpu, B, 0);
+    CPU_set_flag(cpu, U, 0);
 
     return 0;
 }
@@ -721,8 +802,7 @@ uint8_t PLA(CPU6502* cpu)
 uint8_t PLP(CPU6502* cpu)
 {
     cpu->p = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
-    cpu->p |= U;
-    cpu->irqDisableLatch = CPU_get_flag(cpu, I);
+    CPU_set_flag(cpu, U, 1);
     cpu->irqDelay = 1;
 
     return 0;
@@ -766,9 +846,9 @@ uint8_t ROR(CPU6502* cpu)
 uint8_t RTI(CPU6502* cpu)
 {
     cpu->p = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
-    cpu->p &= ~B;
-    cpu->p |= U;
-    cpu->irqDisableLatch = CPU_get_flag(cpu, I);
+
+    CPU_set_flag(cpu, B, 0);
+    CPU_set_flag(cpu, U, 1);
     cpu->irqDelay = 1;
 
     uint16_t low = Bus_read(cpu->bus, 0x0100 + ++cpu->s);
@@ -820,7 +900,6 @@ uint8_t SED(CPU6502* cpu)
 uint8_t SEI(CPU6502* cpu)
 {
     CPU_set_flag(cpu, I, 1);
-    cpu->irqDisableLatch = true;
     cpu->irqDelay = 1;
 
     return 0;

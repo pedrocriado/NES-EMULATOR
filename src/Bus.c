@@ -43,14 +43,11 @@ void Bus_write(Bus* bus, uint16_t addr, uint8_t data)
             case JOY1:
                 Controller_write(bus->controller[0], data);
                 break;
-            case JOY2:
-                
-                break;
         }
     }
     else if(addr <= 0x401F)
     {
-        // TODO
+        // TODO: Additional APU registers
     }
     else
     {
@@ -79,17 +76,13 @@ uint8_t Bus_read(Bus* bus, uint16_t addr)
                 bus->dataBus &= 0xE0;
                 bus->dataBus |= Controller_read(bus->controller[0]) & 0x01;
                 return bus->dataBus;
-            //Cause a bug that made SMB not run.
-            // case JOY2:
-            //     bus->dataBus &= 0xE0;
-            //     bus->dataBus |= Controller_read(bus->controller[1]) & 0x01;
-            //     return bus->dataBus;
+            default:
+                return 0;
         }
-        return 0;
     }
     else if(addr <= 0x401F)
     {
-        // TODO
+        // TODO: Additional APU registers
         return 0;
     }
     else
