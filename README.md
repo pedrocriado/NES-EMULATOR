@@ -18,7 +18,7 @@ Limitations:
 - Only 1 controller mapped; JOY2 is disabled
 - Mapper coverage is limited (MMC1/3/5, CNROM not yet wired)
 - Non‑Windows builds do not have a native file dialog (use CLI)
-- Known visual bugs on a couple of games
+- F1 Race (It seems it is a game that breaks on alot on many Emulators)
 
 ## Build
 
@@ -70,7 +70,7 @@ Note: Only controller 1 is currently mapped.
 - File formats: iNES and NES 2.0 headers
 - Mappers:
   - Implemented: NROM (0), UxROM (2)
-  - Planned/Stubbed: MMC1 (1), CNROM (3), MMC3 (4), MMC5 (5)
+  - Plan to Implement: MMC1 (1), CNROM (3), MMC3 (4), MMC5 (5)
 
 Known good tests/games will be added over time. Expect many commercial games to require additional mappers and APU to be fully playable.
 
@@ -90,14 +90,6 @@ _Castlevania_
 - `src/Mappers/` – Mapper implementations
 - `nes_files/` – Place your ROMs here (ignored in .git); saves in `nes_files/saves/`
 - `CMakeLists.txt` – Build configuration (FetchContent SDL2)
-
-## Roadmap (WIP)
-
-- Implement APU (audio) core and mixing
-- Wire additional mappers (MMC1, CNROM, MMC3, MMC5)
-- Native file dialog on macOS/Linux; common shortcuts
-- Second controller and configurable key bindings
-- Compatibility test suite + CI builds
 
 ## Legal
 

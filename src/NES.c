@@ -46,7 +46,6 @@ void NES_init(NES* nes, const char* filePath)
 
     nes->tvTiming = NTSC_TIMING;
     NES_update_timing(nes);
-    NES_update_window_title(nes);
 
     if(filePath) {
         if(!NES_load_cartridge(nes, filePath)) {

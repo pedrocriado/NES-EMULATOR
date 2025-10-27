@@ -168,6 +168,7 @@ void PPU_clock(PPU* ppu)
         if (!(ppu->ctrl & CTRL_VBLANK))
         {
             ppu->nmiPending = false;
+            ppu->nmi = false;
         }
         else if (ppu->nmiDelay > 0)
         {
@@ -222,18 +223,20 @@ void PPU_clock(PPU* ppu)
                 case 4:
                     if(ppu->mask & MSK_SHOW_ALL)
                     {
-                        addr = ppu->bgNextTileId << 4;
-                        addr += (ppu->v >> 12) & 0x07;
-                        addr |= (ppu->ctrl & CTRL_BG) << 8;
+                        uint16_t fineY = (ppu->v >> 12) & 0x7;
+                        addr = (ppu->ctrl & CTRL_BG) << 8;
+                        addr |= ppu->bgNextTileId << 4;
+                        addr |= fineY;
                         ppu->bgNextTileLow = PPU_read(ppu, addr);
                     }
                     break;
                 case 6:
                     if(ppu->mask & MSK_SHOW_ALL)
                     {
-                        addr = ppu->bgNextTileId << 4;
-                        addr += (ppu->v >> 12) & 0x07;
-                        addr |= (ppu->ctrl & CTRL_BG) << 8;
+                        uint16_t fineY = (ppu->v >> 12) & 0x7;
+                        addr = (ppu->ctrl & CTRL_BG) << 8; 
+                        addr |= ppu->bgNextTileId << 4;
+                        addr |= fineY;
                         ppu->bgNextTileHigh = PPU_read(ppu, addr + 8);
                     }
                     break;
@@ -463,19 +466,21 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
     {
         case PPUCTRL:
         {
+            uint8_t oldCtrl = ppu->ctrl;
             ppu->ctrl = ppu->dataBus = data;
-            ppu->t &= ~(NAMETBL_X | NAMETBL_Y);
-            ppu->t |= (ppu->ctrl & CTRL_NAMETABLE) << 10;
-            if (!(ppu->ctrl & CTRL_VBLANK))
+            
+            ppu->t = (ppu->t & ~0x0C00) | ((data & 0x03) << 10);
+            
+            if ((data & CTRL_VBLANK) == 0)
             {
                 ppu->nmiPending = false;
                 ppu->nmiDelay = 0;
                 ppu->nmi = false;
             }
-            else if ((ppu->ctrl & CTRL_VBLANK) && (ppu->status & STS_VBLANK))
+            else if ((data & CTRL_VBLANK) && ((oldCtrl & CTRL_VBLANK) == 0) && (ppu->status & STS_VBLANK))
             {
                 ppu->nmiPending = true;
-                ppu->nmiDelay = 6;
+                ppu->nmiDelay = 2;
             }
             
             break;
@@ -512,8 +517,8 @@ void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data)
             else
             {
                 ppu->t &= ~(COARSE_Y | FINE_Y);
-                ppu->t |= (data << 5) & COARSE_Y;
-                ppu->t |= (data << 12) & FINE_Y;
+                ppu->t |= ((data & 0xF8) << 2);
+                ppu->t |= ((data & 0x07) << 12);
                 ppu->w = 0;
             }
             break;
