@@ -168,9 +168,27 @@ void Cartridge_load(Cartridge* cart, const char* fileName)
         // the variable will just store it as a byte value that isn't possible
         cart->subMapper = 0xFF;
 
-        if(header[10] & 0x10)
+        //always alocates atleast 8Kb of ram.
+        size_t prgRamBanks = header[8] ? header[8] : 1;
+        cart->prgRamSize = prgRamBanks * 0x2000;
+        if(cart->prgRamSize)
         {
-            cart->prgRam = calloc(1, 0x2000 * header[8]);
+            cart->prgRam = calloc(1, cart->prgRamSize);
+            cart->mapper.hasPrgRam = cart->hasPrgRam = true;
+        }
+
+        if(cart->gameSave)
+        {
+            cart->prgNvRamSize = cart->prgRamSize ? cart->prgRamSize : 0x2000;
+            if(!cart->prgRam)
+            {
+                cart->prgRam = calloc(1, cart->prgNvRamSize);
+                cart->prgRamSize = cart->prgNvRamSize;
+                cart->mapper.hasPrgRam = cart->hasPrgRam = true;
+            }
+            cart->prgNvRam = cart->prgRam;
+            cart->mapper.hasPrgNvRam = cart->hasPrgNvRam = true;
+            Cartridge_save_load(cart);
         }
 
         cart->mapper.tv = (header[9] & 0x01) ? PAL : NTSC;
@@ -188,18 +206,35 @@ void Cartridge_load(Cartridge* cart, const char* fileName)
 
         if(header[10] & 0x0F)
         {
-            cart->prgRam = calloc(1, (64 << (header[10] & 0x0F)));
+            cart->prgRamSize = (size_t)(64 << (header[10] & 0x0F));
+            cart->prgRam = calloc(1, cart->prgRamSize);
+            if(!cart->prgRam) {
+                printf("[ERROR] Failed to allocate PRG RAM\n");
+                exit(EXIT_FAILURE);
+            }
             cart->mapper.hasPrgRam = cart->hasPrgRam = true;
         }
         if(header[10] & 0xF0)
         {
-            cart->prgNvRamChunks = (header[10]  >> 4);
-            cart->prgNvRam = calloc(1, (64 << (header[10]  >> 4)));
-            if(!cart->savePath) {
-                Cartridge_build_save_path(cart, cart->nesFilePath, fileName);
+            cart->prgNvRamSize = (size_t)(64 << ((header[10] >> 4) & 0x0F));
+            if(cart->prgNvRamSize)
+            {
+                if(!cart->prgRam || cart->prgRamSize < cart->prgNvRamSize)
+                {
+                    if(cart->prgRam)
+                        free(cart->prgRam);
+                    cart->prgRam = calloc(1, cart->prgNvRamSize);
+                    if(!cart->prgRam) {
+                        printf("[ERROR] Failed to allocate battery-backed PRG RAM\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    cart->prgRamSize = cart->prgNvRamSize;
+                    cart->mapper.hasPrgRam = cart->hasPrgRam = true;
+                }
+                cart->prgNvRam = cart->prgRam;
+                cart->mapper.hasPrgNvRam = cart->hasPrgNvRam = true;
+                Cartridge_save_load(cart);
             }
-            Cartridge_save_load(cart);
-            cart->mapper.hasPrgNvRam = cart->hasPrgNvRam = true;
         }
         if(header[11] & 0x0F)
         {
@@ -237,53 +272,8 @@ void Cartridge_load(Cartridge* cart, const char* fileName)
     cart->mapper.chrRom = cart->chrRom;
 
     printf("[DEBUG] Mapper ID: %d\n", cart->mapperId);
+    Mapper_set_mirror(&cart->mapper, cart->mapper.mirror);
 
-    // Setting the mirror for the mapper
-    switch (cart->mapper.mirror) {
-        case HORIZONTAL:
-            printf("[DEBUG] Mirroring Horizontal\n");
-            cart->mapper.name_table_map[0] = 0x2000;
-            cart->mapper.name_table_map[1] = 0x2000;
-            cart->mapper.name_table_map[2] = 0x2400;
-            cart->mapper.name_table_map[3] = 0x2400;
-            break;
-        case VERTICAL:
-            printf("[DEBUG] Mirroring Vertical\n");    
-            cart->mapper.name_table_map[0] = 0x2000;
-            cart->mapper.name_table_map[1] = 0x2400;
-            cart->mapper.name_table_map[2] = 0x2000;
-            cart->mapper.name_table_map[3] = 0x2400;
-            break;
-        case ONE_SCREEN_LOWER:
-            printf("[DEBUG] Mirroring One Screen Lower\n");
-            cart->mapper.name_table_map[0] = 0x2000;
-            cart->mapper.name_table_map[1] = 0x2000;
-            cart->mapper.name_table_map[2] = 0x2000;
-            cart->mapper.name_table_map[3] = 0x2000;
-            break;
-        case ONE_SCREEN_UPPER:
-            printf("[DEBUG] Mirroring One Screen Upper\n");
-            cart->mapper.name_table_map[0] = 0x2400;
-            cart->mapper.name_table_map[1] = 0x2400;
-            cart->mapper.name_table_map[2] = 0x2400;
-            cart->mapper.name_table_map[3] = 0x2400;
-            break;
-        case FOUR_SCREEN:
-            printf("[DEBUG] Mirroring Four Screen\n");
-            cart->mapper.name_table_map[0] = 0x2000;
-            cart->mapper.name_table_map[1] = 0x2400;
-            cart->mapper.name_table_map[2] = 0x2800;
-            cart->mapper.name_table_map[3] = 0x2C00;
-            break;
-        default:
-            // Default to horizontal if unsupported
-            printf("[DEBUG] Mirroring Horizontal\n");
-            cart->mapper.name_table_map[0] = 0x2000;
-            cart->mapper.name_table_map[1] = 0x2000;
-            cart->mapper.name_table_map[2] = 0x2400;
-            cart->mapper.name_table_map[3] = 0x2400;
-            break;
-    }
     // Set the proper mapper given the id
     switch (cart->mapperId)
     {
@@ -292,7 +282,8 @@ void Cartridge_load(Cartridge* cart, const char* fileName)
         printf("[DEBUG] Mapper 0 (NROM) initialized\n");
         break;
     case MMC1:
-        //set_mapper1(mapper, cart);
+        set_mapper1(&cart->mapper, cart);
+        printf("[DEBUG] Mapper 1 (MMC1) initialized\n");
         break;
     case UXROM:
         set_mapper2(&cart->mapper, cart);
@@ -317,7 +308,10 @@ bool Cartridge_has_nes_extension(const char* name)
     size_t len = name ? strlen(name) : 0;
     if(len < 4) return false;
     const char* file_type = name + len - 4;
-    return strcmp(file_type, ".nes");
+    return (file_type[0] == '.') &&
+           ((file_type[1] == 'n') || (file_type[1] == 'N')) &&
+           ((file_type[2] == 'e') || (file_type[2] == 'E')) &&
+           ((file_type[3] == 's') || (file_type[3] == 'S'));
 }
 
 void Cartridge_build_save_path(Cartridge* cart, const char* romPath, const char* fallbackName)
@@ -346,12 +340,14 @@ void Cartridge_build_save_path(Cartridge* cart, const char* romPath, const char*
 
 void Cartridge_save_load(Cartridge* cart)
 {
-    if(cart->prgNvRam)
+    if(cart->prgNvRam && cart->prgNvRamSize)
     {
         FILE* saveFile = fopen(cart->savePath, "rb");
         if (saveFile)
         {
-            fread(cart->prgNvRam, 1, cart->prgNvRamChunks, saveFile);
+            size_t read = fread(cart->prgNvRam, 1, cart->prgNvRamSize, saveFile);
+            if(read < cart->prgNvRamSize)
+                memset(cart->prgNvRam + read, 0, cart->prgNvRamSize - read);
             fclose(saveFile);
         }
     }
@@ -359,12 +355,12 @@ void Cartridge_save_load(Cartridge* cart)
 
 void Cartridge_save(Cartridge* cart)
 {
-    if(cart->prgNvRam)
+    if(cart->prgNvRam && cart->prgNvRamSize)
     {
         FILE* saveFile = fopen(cart->savePath, "wb");
         if (saveFile)
         {
-            fwrite(cart->prgNvRam, 1, cart->prgNvRamChunks, saveFile);
+            fwrite(cart->prgNvRam, 1, cart->prgNvRamSize, saveFile);
             fclose(saveFile);
         }
     }
@@ -372,6 +368,9 @@ void Cartridge_save(Cartridge* cart)
 
 void Cartridge_reset(Cartridge* cart)
 {
+    if(cart->prgNvRam)
+        Cartridge_save(cart);
+
     if(cart->trainer)
         free(cart->trainer);
     if(cart->prgRom)
@@ -383,18 +382,17 @@ void Cartridge_reset(Cartridge* cart)
     if(cart->chrRam)
         free(cart->chrRam);
 
-    // Check if game needs to be saved.
-    if(cart->prgNvRam)
-    {
-        Cartridge_save(cart);
+    if(cart->prgNvRam && cart->prgNvRam != cart->prgRam)
         free(cart->prgNvRam);
-    }
 
     memset(cart, 0, sizeof(Cartridge));
 }
 
 void Cartridge_free(Cartridge* cart)
 {
+    if(cart->prgNvRam)
+        Cartridge_save(cart);
+
     if(cart->trainer)
         free(cart->trainer);
     if(cart->prgRom)
@@ -406,12 +404,8 @@ void Cartridge_free(Cartridge* cart)
     if(cart->chrRam)
         free(cart->chrRam);
     
-    // Check if game needs to be saved.
-    if(cart->prgNvRam)
-    {
-        Cartridge_save(cart);
+    if(cart->prgNvRam && cart->prgNvRam != cart->prgRam)
         free(cart->prgNvRam);
-    }
 
     free(cart);
 }

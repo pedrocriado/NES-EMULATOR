@@ -31,6 +31,15 @@ typedef enum TVSystem
     DENDY,
 } TVSystem;
 
+typedef struct MMC1_REG
+{
+    uint8_t SR;
+    uint8_t control;
+    uint8_t chrBank0;
+    uint8_t chrBank1;
+    uint8_t prgBank;
+} MMC1_REG;
+
 typedef struct Mapper
 {
     struct Cartridge* cart;
@@ -41,7 +50,9 @@ typedef struct Mapper
     uint8_t* prgRom;
     uint8_t* chrRom;
 
-    int clamp, prgPointerOffset;
+    int prgClamp, chrClamp, prgPointerOffset;
+
+    MMC1_REG mmc1;
 
     bool hasPrgRam;
     bool hasChrRam;
@@ -69,6 +80,50 @@ inline void Mapper_free(Mapper* mapper)
 {
     if(!mapper) return;
     free(mapper);
+}
+
+inline void Mapper_set_mirror(Mapper* mapper, Mirror mirror)
+{
+    // Setting the mirror for the mapper
+    switch (mirror) {
+        case HORIZONTAL:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case VERTICAL: 
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2000;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case ONE_SCREEN_LOWER:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2000;
+            mapper->name_table_map[3] = 0x2000;
+            break;
+        case ONE_SCREEN_UPPER:
+            mapper->name_table_map[0] = 0x2400;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+        case FOUR_SCREEN:
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2400;
+            mapper->name_table_map[2] = 0x2800;
+            mapper->name_table_map[3] = 0x2C00;
+            break;
+        default:
+            // Default to horizontal if unsupported
+            mapper->name_table_map[0] = 0x2000;
+            mapper->name_table_map[1] = 0x2000;
+            mapper->name_table_map[2] = 0x2400;
+            mapper->name_table_map[3] = 0x2400;
+            break;
+    }
 }
 
 void set_mapper0(Mapper* mapper, struct Cartridge* cart);

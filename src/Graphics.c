@@ -18,7 +18,7 @@ static void Graphics_windows_menu(Graphics* grap);
 void Graphics_init(Graphics* grap)
 {
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO |
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO |
         SDL_INIT_EVENTS) != 0) {
         printf("SDL_Init Error: %s\n", SDL_GetError());
         return;

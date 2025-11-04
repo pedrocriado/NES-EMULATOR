@@ -17,7 +17,7 @@ void set_mapper0(Mapper* mapper, Cartridge* cart)
     mapper->prg_read = prg_read;
     mapper->chr_read = chr_read;
     mapper->cart = cart;
-    mapper->clamp = (mapper->prgChunks * 0x4000) - 1;
+    mapper->prgClamp = (mapper->prgChunks * 0x4000) - 1;
 }
 
 static void prg_write(Mapper* mapper, uint16_t addr, uint8_t data)
@@ -42,7 +42,7 @@ static uint8_t prg_read(Mapper* mapper, uint16_t addr)
 
     if(addr >= 0x8000 && addr <= 0xFFFF)
     {
-        return mapper->prgRom[addr & mapper->clamp];
+        return mapper->prgRom[addr & mapper->prgClamp];
     }
 
     return 0;

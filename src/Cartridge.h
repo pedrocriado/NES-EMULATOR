@@ -25,7 +25,8 @@ typedef struct Cartridge
 
     uint16_t prgChunks;
     uint16_t chrChunks;
-    uint8_t prgNvRamChunks;
+    size_t prgRamSize;
+    size_t prgNvRamSize;
 
     bool hasPrgRam;
     bool hasChrRam;

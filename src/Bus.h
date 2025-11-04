@@ -15,9 +15,29 @@ struct Controller;
 
 typedef enum IORegister
 { 
-    OAMDMA = 0x4014,
-    JOY1   = 0x4016,
-    JOY2   = 0x4017,
+    APUPULSE1 = 0x4000,
+    // APUPULSE1 = 0x4001,
+    // APUPULSE1 = 0x4002,
+    // APUPULSE1 = 0x4003,
+    // APUPULSE2 = 0x4004,
+    // APUPULSE2 = 0x4005,
+    // APUPULSE2 = 0x4006,
+    // APUPULSE2 = 0x4007,
+    // APUPULSE2 = 0x4008,
+    // APUPULSE2 = 0x4009,
+    // APUPULSE2 = 0x400A,
+    // APUPULSE2 = 0x400B,
+    // APUPULSE2 = 0x400C,
+    // APUPULSE2 = 0x400D,
+    // APUPULSE2 = 0x400F,
+    // APUPULSE2 = 0x4010,
+    // APUPULSE2 = 0x4011,
+    // APUPULSE2 = 0x4012,
+    // APUPULSE2 = 0x4013,
+    OAMDMA    = 0x4014,
+    // APUPULSE2 = 0x4015,
+    JOY1      = 0x4016,
+    JOY2      = 0x4017,
 } IORegister;
 
 typedef struct Bus

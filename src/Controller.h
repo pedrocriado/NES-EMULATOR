@@ -26,4 +26,3 @@ typedef struct JoyPad
 void Controller_init(JoyPad* ctrl);
 void Controller_write(JoyPad* ctrl, uint8_t data);
 uint8_t Controller_read(JoyPad* ctrl);
-uint8_t Controller_input_key(SDL_Scancode key);

@@ -20,6 +20,7 @@ static bool NES_load_cartridge(NES* nes, const char* romPath);
 static void NES_update_window_title(NES* nes);
 static void NES_handle_menu_command(NES* nes, uint32_t command);
 static void NES_reset_runtime_state(NES* nes);
+static void NES_refresh_controller_state(NES* nes);
 
 void NES_init(NES* nes, const char* filePath)
 { 
@@ -68,15 +69,13 @@ void NES_start(NES* nes)
                     running = 0;
                     break;
                 case SDL_KEYDOWN:
-                    if(nes->cartLoaded) {
-                        uint8_t key = Controller_input_key(event.key.keysym.scancode);
-                        nes->bus.controller[0]->state |= key;
+                    if(nes->cartLoaded && event.key.repeat == 0) {
+                        NES_refresh_controller_state(nes);
                     }
                     break;
                 case SDL_KEYUP:
                     if(nes->cartLoaded) {
-                        uint8_t key = Controller_input_key(event.key.keysym.scancode);
-                        nes->bus.controller[0]->state &= ~key;
+                        NES_refresh_controller_state(nes);
                     }
                     break;
 #ifdef _WIN32
@@ -148,6 +147,26 @@ static void NES_reset_runtime_state(NES* nes)
     memset(nes->bus.ram, 0, sizeof(nes->bus.ram));
     Controller_init(&nes->Controller[0]);
     Controller_init(&nes->Controller[1]);
+}
+
+static void NES_refresh_controller_state(NES* nes)
+{
+    const Uint8* keys = SDL_GetKeyboardState(NULL);
+    uint8_t state = 0;
+
+    if(keys[SDL_SCANCODE_RIGHT]) state |= 0x80;
+    if(keys[SDL_SCANCODE_LEFT])  state |= 0x40;
+    if(keys[SDL_SCANCODE_DOWN])  state |= 0x20;
+    if(keys[SDL_SCANCODE_UP])    state |= 0x10;
+    if(keys[SDL_SCANCODE_F])     state |= 0x08;
+    if(keys[SDL_SCANCODE_G])     state |= 0x04;
+    if(keys[SDL_SCANCODE_X])     state |= 0x02;
+    if(keys[SDL_SCANCODE_Z])     state |= 0x01;
+
+    if((state & 0x80) && (state & 0x40)) state &= ~0xC0;
+    if((state & 0x20) && (state & 0x10)) state &= ~0x30;
+
+    nes->bus.controller[0]->state = state;
 }
 
 static void NES_handle_menu_command(NES* nes, uint32_t command)
