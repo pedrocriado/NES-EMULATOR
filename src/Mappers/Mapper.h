@@ -50,7 +50,7 @@ typedef struct Mapper
     uint8_t* prgRom;
     uint8_t* chrRom;
 
-    int prgClamp, chrClamp, prgPointerOffset;
+    int prgClamp, chrClamp, prgPointerOffset, chrPointerOffset;
 
     MMC1_REG mmc1;
 

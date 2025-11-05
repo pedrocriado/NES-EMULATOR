@@ -9,14 +9,14 @@ This README covers how to build and run it, what currently works, and known limi
 - CPU/PPU core running with background + sprite rendering
 - Controller 1 (keyboard) supported
 - iNES/NES 2.0 headers parsed
-- Mappers: NROM (0), MMC1 (1) UxROM (2) implemented.
+- Mappers: NROM (0), MMC1 (1) UxROM (2), CNROM (3) implemented.
 - Windows native File → Open ROM menu
 
 Limitations:
 
 - Audio (APU) not implemented yet
 - Only 1 controller mapped; JOY2 is disabled
-- Mapper coverage is limited (MMC3/5, CNROM not yet wired)
+- Mapper coverage is limited (MMC3/5 not yet implemented)
 - Non‑Windows builds do not have a native file dialog (use CLI)
 - F1 Race (It seems it is a game that breaks on alot on many Emulators)
 
@@ -69,8 +69,8 @@ Note: Only controller 1 is currently mapped.
 
 - File formats: iNES and NES 2.0 headers
 - Mappers:
-  - Implemented: NROM (0), MMC1 (1), UxROM (2)
-  - Plan to Implement: CNROM (3), MMC3 (4), MMC5 (5)
+  - Implemented: NROM (0), MMC1 (1), UxROM (2), CNROM (3)
+  - Plan to Implement: MMC3 (4), MMC5 (5)
 
 Known good tests/games will be added over time. Many commercial games to require additional mappers and APU to be fully playable.
 

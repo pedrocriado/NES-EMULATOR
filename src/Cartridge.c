@@ -290,7 +290,8 @@ void Cartridge_load(Cartridge* cart, const char* fileName)
         printf("[DEBUG] Mapper 2 (NxROM) initialized\n");
         break;
     case CNROM:
-        //set_mapper3(mapper, cart);
+        set_mapper3(&cart->mapper, cart);
+        printf("[DEBUG] Mapper 3 (CNROM) initialized\n");
         break;
     case MMC3:
         //set_mapper4(mapper, cart);
