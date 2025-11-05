@@ -27,7 +27,10 @@ static void prg_write(Mapper* mapper, uint16_t addr, uint8_t data)
         if(mapper->hasPrgRam)
             mapper->cart->prgRam[addr - 0x6000] = data; 
     }
-    mapper->chrPointerOffset = 0x2000 * (data & 0x03);
+    else
+    {
+        mapper->chrPointerOffset = 0x2000 * (data % mapper->chrChunks);
+    }
 }
 
 static void chr_write(Mapper* mapper, uint16_t addr, uint8_t data)
@@ -39,7 +42,12 @@ static void chr_write(Mapper* mapper, uint16_t addr, uint8_t data)
 static uint8_t prg_read(Mapper* mapper, uint16_t addr)
 {
     if(addr >= 0x6000 && addr <= 0x7FFF)
+    {
+        if(mapper->hasChrRam)
+            return mapper->cart->chrRam[addr & 0x1FFF];
         return 0;
+    }
+        
 
     if(addr >= 0x8000 && addr <= 0xFFFF)
     {
