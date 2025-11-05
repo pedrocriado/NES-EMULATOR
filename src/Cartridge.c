@@ -336,6 +336,7 @@ void Cartridge_build_save_path(Cartridge* cart, const char* romPath, const char*
     }
 
     snprintf(cart->savePath, sizeof(cart->savePath), "%s%s.sav", NES_SAVE_PATH, nameBuffer);
+    printf("[DEBUG] Save Path folder located at: %s\n", cart->savePath);
 }
 
 void Cartridge_save_load(Cartridge* cart)
