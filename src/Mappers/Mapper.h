@@ -70,19 +70,17 @@ typedef struct Mapper
     uint8_t (*chr_read)(struct Mapper*, uint16_t);
 } Mapper;
 
-inline void Mapper_reset(Mapper* mapper)
+static inline void Mapper_reset(Mapper* mapper)
 {
-    if(!mapper) return;
     memset(mapper, 0, sizeof(Mapper));
 }
 
-inline void Mapper_free(Mapper* mapper)
+static inline void Mapper_free(Mapper* mapper)
 {
-    if(!mapper) return;
     free(mapper);
 }
 
-inline void Mapper_set_mirror(Mapper* mapper, Mirror mirror)
+static inline void Mapper_set_mirror(Mapper* mapper, Mirror mirror)
 {
     // Setting the mirror for the mapper
     switch (mirror) {

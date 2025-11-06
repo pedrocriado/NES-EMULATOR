@@ -35,8 +35,24 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL2)
 
 # Link SDL2 targets
-target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main winmm)
+target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main)
+
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(GTK3 gtk+-3.0)
+    endif()
+
+    if(GTK3_FOUND)
+        target_compile_definitions(nes PRIVATE GRAPHICS_HAS_GTK=1)
+        target_include_directories(nes PRIVATE ${GTK3_INCLUDE_DIRS})
+        target_link_directories(nes PRIVATE ${GTK3_LIBRARY_DIRS})
+        target_link_libraries(nes PRIVATE ${GTK3_LIBRARIES})
+        target_compile_options(nes PRIVATE ${GTK3_CFLAGS_OTHER})
+        target_link_options(nes PRIVATE ${GTK3_LDFLAGS_OTHER})
+    endif()
+endif()
 
 if(WIN32)
-    target_link_libraries(nes PRIVATE comdlg32)
+    target_link_libraries(nes PRIVATE comdlg32 winmm)
 endif()

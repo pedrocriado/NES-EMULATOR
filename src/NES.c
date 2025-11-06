@@ -69,6 +69,14 @@ void NES_start(NES* nes)
                     running = 0;
                     break;
                 case SDL_KEYDOWN:
+                    if(event.key.repeat == 0 &&
+                       event.key.keysym.sym == SDLK_o &&
+                       (event.key.keysym.mod & KMOD_CTRL)) {
+                        char romPath[NES_MAX_ROM_PATH] = {0};
+                        if(Graphics_prompt_rom_selection(&nes->graphics, romPath, sizeof(romPath))) {
+                            NES_load_cartridge(nes, romPath);
+                        }
+                    }
                     if(nes->cartLoaded && event.key.repeat == 0) {
                         NES_refresh_controller_state(nes);
                     }
@@ -171,6 +179,7 @@ static void NES_refresh_controller_state(NES* nes)
 
 static void NES_handle_menu_command(NES* nes, uint32_t command)
 {
+#ifdef _WIN32
     switch(command) {
         case GRAPHICS_MENU_CMD_OPEN_ROM: {
             char romPath[NES_MAX_ROM_PATH];
@@ -179,6 +188,7 @@ static void NES_handle_menu_command(NES* nes, uint32_t command)
             break;
         }
     }
+#endif
 }
 
 static void NES_update_timing(NES* nes)

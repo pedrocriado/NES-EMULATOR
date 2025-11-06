@@ -10,14 +10,16 @@ This README covers how to build and run it, what currently works, and known limi
 - Controller 1 (keyboard) supported
 - iNES/NES 2.0 headers parsed
 - Mappers: NROM (0), MMC1 (1) UxROM (2), CNROM (3) implemented.
-- Windows native File → Open ROM menu
+- Nes file select
+  - Windows: File → Open ROM menu
+  - Linux: ctrl + o
 
 Limitations:
 
 - Audio (APU) not implemented yet
 - Only 1 controller mapped; JOY2 is disabled
 - Mapper coverage is limited (MMC3/5 not yet implemented)
-- Non‑Windows builds do not have a native file dialog (use CLI)
+- Mac file select has not been implemented
 - F1 Race (It seems it is a game that breaks on alot on many Emulators)
 
 ## Build
@@ -27,7 +29,6 @@ Prerequisites:
 - CMake 3.16+
 - A C compiler and build tools
   - Windows: Visual Studio 2022 (MSVC)
-  - macOS: Xcode CLT (clang)
   - Linux: GCC/Clang + build‑essentials
 - Internet access (CMake will FetchContent SDL2 automatically)
 
@@ -44,16 +45,19 @@ SDL2 is fetched and built as part of the project; you don’t need to install it
 
 ## Run
 
-You can pass a ROM path on the command line, or on Windows open it via the menu.
+You can pass a ROM path on the command line, or by doing ctrl + O.
 
+Windows
 ```bash
-# From the project root (example using a ROM inside nes_files)
 ./build/Debug/nes ./path/to/file/file.nes
 ```
 
-Windows also exposes a native File → Open ROM… menu. On macOS/Linux, use the CLI path argument for now.
+Linux
+```bash
+./build/nes ./path/to/file/file.nes
+```
 
-ROMs are searched relative to `./nes_files/`.
+ROMs are searched relative to `nes` executable location.
 
 ## Controls
 
@@ -72,7 +76,7 @@ Note: Only controller 1 is currently mapped.
   - Implemented: NROM (0), MMC1 (1), UxROM (2), CNROM (3)
   - Plan to Implement: MMC3 (4), MMC5 (5)
 
-Known good tests/games will be added over time. Many commercial games to require additional mappers and APU to be fully playable.
+The addition of these mappers would allow for many more games to be played on the emulator.
 
 ## Screenshots
 
@@ -86,8 +90,8 @@ _Castlevania_
 
 ## Project Layout
 
-- `src/` – Emulator sources (CPU6502, PPU, bus, cartridge, controller, SDL2 graphics)
-- `src/Mappers/` – Mapper implementations
+- `src/` – Emulator sources (CPU6502, PPU, Bus, Cartridge, Controller, Graphics)
+- `src/Mappers/` – implemented mappers
 - `nes_files/` – Place your ROMs here (ignored in .git); saves in `nes_files/saves/`
 - `CMakeLists.txt` – Build configuration (FetchContent SDL2)
 
