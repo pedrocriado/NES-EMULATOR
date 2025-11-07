@@ -7,8 +7,7 @@
 
 void PPU_init(PPU* ppu)
 {
-    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
-    memset(ppu->screen, 0, sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+    ppu->screen = malloc(sizeof(uint8_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
 
     ppu->scanLines = 0;
     ppu->pixels = 0;
@@ -411,7 +410,7 @@ void PPU_clock(PPU* ppu)
             
             uint8_t palette_addr = (final_palette << 2) | final_pixel;
             uint8_t color = ppu->palette[palette_addr] & 0x3F;
-            ppu->screen[(scanline * PPU_SCANLINE) + (pixel - 1)] = nes_palette[color];
+            ppu->screen[(scanline * PPU_SCANLINE) + (pixel - 1)] = color;
         }
     }
     else if(scanline < ppu->scanLinesPerFame - 1)

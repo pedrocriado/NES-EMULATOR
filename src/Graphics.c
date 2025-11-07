@@ -71,11 +71,18 @@ void Graphics_init(Graphics* grap)
         PIXEL_WIDTH,
         PIXEL_HEIGHT
     );
+
+    grap->screenBuffer = malloc(sizeof(uint32_t) * PIXEL_WIDTH * PIXEL_HEIGHT);
+    memset(grap->screenBuffer, 0, sizeof(uint32_t) * PIXEL_WIDTH * PIXEL_HEIGHT);
 }
 
-void Graphics_render(Graphics* grap, uint32_t* screen)
+void Graphics_render(Graphics* grap, uint8_t* screen)
 {
-    SDL_UpdateTexture(grap->texture, NULL, screen, PIXEL_WIDTH * sizeof(uint32_t));
+    for(int i = 0; i < PIXEL_WIDTH * PIXEL_HEIGHT; i++)
+    {
+        grap->screenBuffer[i] = nes_palette[screen[i] & 0x3F];
+    }
+    SDL_UpdateTexture(grap->texture, NULL, grap->screenBuffer, PIXEL_WIDTH * sizeof(uint32_t));
     SDL_RenderClear(grap->renderer);
     SDL_RenderCopy(grap->renderer, grap->texture, NULL, NULL);
     SDL_RenderPresent(grap->renderer);
