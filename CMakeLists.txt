@@ -35,7 +35,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL2)
 
 # Link SDL2 targets
-target_link_libraries(nes PRIVATE SDL2::SDL2-static SDL2::SDL2main)
+target_link_libraries(nes PRIVATE SDL2::SDL2 SDL2::SDL2main)
 
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig)
