@@ -43,6 +43,24 @@ cmake --build build
 
 SDL2 is fetched and built as part of the project; you don’t need to install it system‑wide.
 
+### PocketBeagle ↔ Linux mDNS sample
+
+If you want a minimal example of how a PocketBeagle can announce itself over
+mDNS and exchange TCP packets with a Linux host (RPi, desktop, etc.), enable the
+optional CMake flag and use the helper binaries documented in
+`docs/pb2_mdns_demo.md`:
+
+```bash
+cmake -S . -B build -D HAZARDOUSNES_BUILD_PB2_MDNS_EXAMPLES=ON
+cmake --build build
+```
+
+The build automatically downloads the lightweight [`mdns`](https://github.com/mjansson/mdns)
+library, so no system packages are required. The PB2 program publishes the
+`_haznes._tcp` service and waits for controller updates, while the Linux tool
+discovers the service via that embedded mDNS stack and sends sample payloads in
+both directions.
+
 ## Run
 
 You can pass a ROM path on the command line, or by doing ctrl + O.

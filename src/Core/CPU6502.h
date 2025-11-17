@@ -4,7 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "Bus.h"
+#define RAM_SIZE 0x0800     // 2 KB of RAM
+#define PALETTE_RAM 0x20    // 32 bytes
+#define PPU_REGISTER 0x0008 // 8 bytes
 
 typedef enum Flags
 {
@@ -26,11 +28,39 @@ typedef struct InstructionContext{
     uint8_t cycles;
 } InstructionContext;
 
-struct Bus;
+typedef enum IORegister
+{ 
+    APUPULSE1 = 0x4000,
+    // APUPULSE1 = 0x4001,
+    // APUPULSE1 = 0x4002,
+    // APUPULSE1 = 0x4003,
+    // APUPULSE2 = 0x4004,
+    // APUPULSE2 = 0x4005,
+    // APUPULSE2 = 0x4006,
+    // APUPULSE2 = 0x4007,
+    // APUPULSE2 = 0x4008,
+    // APUPULSE2 = 0x4009,
+    // APUPULSE2 = 0x400A,
+    // APUPULSE2 = 0x400B,
+    // APUPULSE2 = 0x400C,
+    // APUPULSE2 = 0x400D,
+    // APUPULSE2 = 0x400F,
+    // APUPULSE2 = 0x4010,
+    // APUPULSE2 = 0x4011,
+    // APUPULSE2 = 0x4012,
+    // APUPULSE2 = 0x4013,
+    OAMDMA    = 0x4014,
+    // APUPULSE2 = 0x4015,
+    JOY1      = 0x4016,
+    JOY2      = 0x4017,
+} IORegister;
 
 typedef struct CPU6502
 {
     struct Bus* bus;
+    struct PPU* ppu;
+    struct Cartridge* cart;
+    struct JoyPad* controller[2];
 
     // Registers
     uint8_t a;		// Accumulator
@@ -52,21 +82,15 @@ typedef struct CPU6502
     bool suppressInterrupt;
     uint8_t irqDelay;
     bool suppressNmiOnce;
+    
+    // Bus data
+    uint8_t dataBus;
+    uint8_t ram[RAM_SIZE];
 } CPU6502;
 
 void CPU_init(CPU6502* cpu);
 void CPU_free(CPU6502* cpu);
 void CPU_clock(CPU6502* cpu);
-void CPU_reset(CPU6502* cpu);
-void CPU_irq(CPU6502* cpu);
-void CPU_nmi(CPU6502* cpu);
-void CPU_poll_interrupt(CPU6502* cpu);
-void CPU_poll_interrupt_cant_disable(CPU6502* cpu);
-
-void CPU_branch_helper(CPU6502* cpu, bool condition);
-
-uint8_t CPU_get_flag(CPU6502* cpu, Flags flag);
-void CPU_set_flag(CPU6502* cpu, Flags flag, bool value);
 
 uint8_t CPU_fetch(CPU6502* cpu);
 

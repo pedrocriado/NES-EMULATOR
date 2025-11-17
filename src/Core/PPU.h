@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "Bus.h"
 #include "Cartridge.h"
 
 #define PPU_SCANLINE 256
@@ -70,7 +69,6 @@ typedef struct OAM
 
 typedef struct PPU
 {
-    Bus* bus;
     Cartridge* cart;
     
     // Registers
@@ -119,8 +117,6 @@ typedef struct PPU
 } PPU;
 
 void PPU_init(PPU* ppu);
-void PPU_write(PPU* ppu, uint16_t addr, uint8_t data);
-uint8_t PPU_read(PPU* ppu, uint16_t addr);
 void PPU_clock(PPU* ppu);
 void PPU_set_register(PPU* ppu, uint16_t addr, uint8_t data);
 uint8_t PPU_get_register(PPU* ppu, uint16_t addr);

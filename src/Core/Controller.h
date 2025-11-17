@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <SDL.h>
 
 typedef enum ButtonFlags
 {

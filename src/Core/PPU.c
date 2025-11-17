@@ -5,6 +5,9 @@
 #include "PPU.h"
 #include "CPU6502.h"
 
+static void PPU_write(PPU* ppu, uint16_t addr, uint8_t data);
+static uint8_t PPU_read(PPU* ppu, uint16_t addr);
+
 void PPU_init(PPU* ppu)
 {
     ppu->screen = malloc(sizeof(uint8_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
@@ -26,9 +29,8 @@ void PPU_init(PPU* ppu)
     memset(ppu->secondaryOamIndex, 0xFF, sizeof(ppu->secondaryOamIndex));
 }
 
-uint8_t PPU_read(PPU* ppu, uint16_t addr)
+static uint8_t PPU_read(PPU* ppu, uint16_t addr)
 {
-    addr &= 0x3FFF;
     uint8_t data = 0x00;
 
     if (addr <= 0x1FFF) 
@@ -54,9 +56,8 @@ uint8_t PPU_read(PPU* ppu, uint16_t addr)
     return data;
 }
 
-void PPU_write(PPU* ppu, uint16_t addr, uint8_t data)
+static void PPU_write(PPU* ppu, uint16_t addr, uint8_t data)
 {
-    addr &= 0x3FFF;
     ppu->ioBus = data;
 
     if (addr <= 0x1FFF) {
@@ -74,34 +75,6 @@ void PPU_write(PPU* ppu, uint16_t addr, uint8_t data)
 }
 
 // Helper functions
-static void increment_coarse_x(PPU* ppu)
-{
-    if ((ppu->v & COARSE_X) == COARSE_X) {
-        ppu->v &= ~COARSE_X;
-        ppu->v ^= NAMETBL_X;
-    } else {
-        ppu->v++;
-    }
-}
-
-static void increment_y(PPU* ppu)
-{
-    if ((ppu->v & FINE_Y) != FINE_Y) {
-        ppu->v += 0x1000;
-    } else {
-        ppu->v &= ~FINE_Y;
-        uint16_t y = (ppu->v & COARSE_Y) >> 5;
-        if (y == 29) {
-            y = 0;
-            ppu->v ^= NAMETBL_Y;
-        } else if (y == 31) {
-            y = 0;
-        } else {
-            y++;
-        }
-        ppu->v = (ppu->v & ~COARSE_Y) | (y << 5);
-    }
-}
 
 static uint8_t oamRead(PPU* ppu)
 {
@@ -135,29 +108,6 @@ static uint8_t oamRead(PPU* ppu)
         }
     }
     return data;
-}
-
-static void load_bg_shifters(PPU* ppu)
-{
-    ppu->bgShiftPtrLow = (ppu->bgShiftPtrLow & 0xFF00) | ppu->bgNextTileLow;
-    ppu->bgShiftPtrHigh = (ppu->bgShiftPtrHigh & 0xFF00) | ppu->bgNextTileHigh;
-    
-    uint8_t attr_lo = (ppu->bgNextTileAttr & 0x01) ? 0xFF : 0x00;
-    uint8_t attr_hi = (ppu->bgNextTileAttr & 0x02) ? 0xFF : 0x00;
-    
-    ppu->bgShiftAttrLow = (ppu->bgShiftAttrLow & 0xFF00) | attr_lo;
-    ppu->bgShiftAttrHigh = (ppu->bgShiftAttrHigh & 0xFF00) | attr_hi;
-}
-
-static void update_shifters(PPU* ppu)
-{
-    if(ppu->mask & MSK_SHOW_ALL)
-    {
-        ppu->bgShiftPtrLow <<= 1;
-        ppu->bgShiftPtrHigh <<= 1;
-        ppu->bgShiftAttrLow <<= 1;
-        ppu->bgShiftAttrHigh <<= 1;
-    }
 }
 
 void PPU_clock(PPU* ppu)
@@ -199,11 +149,25 @@ void PPU_clock(PPU* ppu)
     { // 0 - 239 and 261
         if((pixel >= 2 && pixel < 258) || (pixel >= 321 && pixel < 338))
         {
-            update_shifters(ppu);
+            if(ppu->mask & MSK_BG)
+            {
+                ppu->bgShiftPtrLow <<= 1;
+                ppu->bgShiftPtrHigh <<= 1;
+                ppu->bgShiftAttrLow <<= 1;
+                ppu->bgShiftAttrHigh <<= 1;
+            }
             switch((pixel - 1) & 0x07)
             {
                 case 0:
-                    load_bg_shifters(ppu);
+                    ppu->bgShiftPtrLow = (ppu->bgShiftPtrLow & 0xFF00) | ppu->bgNextTileLow;
+                    ppu->bgShiftPtrHigh = (ppu->bgShiftPtrHigh & 0xFF00) | ppu->bgNextTileHigh;
+                    
+                    uint8_t attr_lo = (ppu->bgNextTileAttr & 0x01) ? 0xFF : 0x00;
+                    uint8_t attr_hi = (ppu->bgNextTileAttr & 0x02) ? 0xFF : 0x00;
+                    
+                    ppu->bgShiftAttrLow = (ppu->bgShiftAttrLow & 0xFF00) | attr_lo;
+                    ppu->bgShiftAttrHigh = (ppu->bgShiftAttrHigh & 0xFF00) | attr_hi;
+
                     if(ppu->mask & MSK_SHOW_ALL)
                         ppu->bgNextTileId = PPU_read(ppu, 0x2000 | (ppu->v & 0x0FFF));
                     break;
@@ -242,14 +206,40 @@ void PPU_clock(PPU* ppu)
                     
                 case 7:
                     if(ppu->mask & MSK_SHOW_ALL)
-                        increment_coarse_x(ppu);
+                    {
+                        if ((ppu->v & COARSE_X) == COARSE_X) 
+                        {
+                            ppu->v &= ~COARSE_X;
+                            ppu->v ^= NAMETBL_X;
+                        } 
+                        else 
+                        {
+                            ppu->v++;
+                        }
+                    }
                     break;
             }
         }
         
         if(pixel == 256)
             if(ppu->mask & MSK_SHOW_ALL)
-                increment_y(ppu);
+            {
+                if ((ppu->v & FINE_Y) != FINE_Y) {
+                    ppu->v += 0x1000;
+                } else {
+                    ppu->v &= ~FINE_Y;
+                    uint16_t y = (ppu->v & COARSE_Y) >> 5;
+                    if (y == 29) {
+                        y = 0;
+                        ppu->v ^= NAMETBL_Y;
+                    } else if (y == 31) {
+                        y = 0;
+                    } else {
+                        y++;
+                    }
+                    ppu->v = (ppu->v & ~COARSE_Y) | (y << 5);
+                }
+            }
 
         if(pixel == 257)
             if(ppu->mask & MSK_SHOW_ALL)
@@ -293,12 +283,12 @@ void PPU_clock(PPU* ppu)
                     uint16_t bit_mask = 0x8000 >> ppu->x;
                     
                     uint8_t pixel_lo = (ppu->bgShiftPtrLow & bit_mask) ? 1 : 0;
-                    uint8_t pixel_hi = (ppu->bgShiftPtrHigh & bit_mask) ? 1 : 0;
-                    bg_pixel = (pixel_hi << 1) | pixel_lo;
+                    uint8_t pixel_hi = (ppu->bgShiftPtrHigh & bit_mask) ? 2 : 0;
+                    bg_pixel = pixel_hi | pixel_lo;
                     
                     uint8_t pal_lo = (ppu->bgShiftAttrLow & bit_mask) ? 1 : 0;
-                    uint8_t pal_hi = (ppu->bgShiftAttrHigh & bit_mask) ? 1 : 0;
-                    bg_palette = (pal_hi << 1) | pal_lo;
+                    uint8_t pal_hi = (ppu->bgShiftAttrHigh & bit_mask) ? 2 : 0;
+                    bg_palette = pal_hi | pal_lo;
                 }
             }
 
@@ -325,21 +315,21 @@ void PPU_clock(PPU* ppu)
                         if(x_offset < 0 || x_offset >= 8)
                             continue;
 
-                        uint8_t row = (uint8_t)y_offset;
-                        uint8_t col = (uint8_t)x_offset;
+                        uint8_t row = y_offset;
+                        uint8_t col = x_offset;
 
                         if(sprite.attr & OAM_FLIP_Y)
-                            row = (uint8_t)((len - 1) - row);
+                            row = ((len - 1) - row);
 
                         if(sprite.attr & OAM_FLIP_X)
-                            col = (uint8_t)(7 - col);
+                            col = (7 - col);
                         
                         uint16_t pattern_addr;
                         
                         if(len == 16)
                         {
                             uint16_t bank = (sprite.idx & 0x01) ? 0x1000 : 0x0000;
-                            uint8_t tile_num = sprite.idx & 0xFE;
+                            uint8_t tile_num = sprite.idx & ~0x01;
                             if(row >= 8)
                             {
                                 tile_num++;
@@ -356,10 +346,10 @@ void PPU_clock(PPU* ppu)
                         uint8_t pattern_lo = PPU_read(ppu, pattern_addr);
                         uint8_t pattern_hi = PPU_read(ppu, pattern_addr + 8);
                         
-                        uint8_t bit = 7 - col;
-                        uint8_t pixel_lo = (pattern_lo >> bit) & 0x01;
-                        uint8_t pixel_hi = (pattern_hi >> bit) & 0x01;
-                        sprite_pixel = (pixel_hi << 1) | pixel_lo;
+                        uint8_t shift = 1 << (7 - col);
+                        uint8_t pixel_lo = (pattern_lo & shift) ? 1 : 0;
+                        uint8_t pixel_hi = (pattern_hi & shift) ? 2 : 0;
+                        sprite_pixel = pixel_hi | pixel_lo;
                         
                         if(sprite_pixel == 0)
                             continue;

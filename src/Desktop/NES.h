@@ -1,14 +1,14 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
-#include "CPU6502.h"
-#include "PPU.h"
-#include "Bus.h"
-#include "APU.h"
-#include "Cartridge.h"
 #include "Graphics.h"
-#include "Controller.h"
+#include "../Core/CPU6502.h"
+#include "../Core/PPU.h"
+#include "../Core/APU.h"
+#include "../Core/Cartridge.h"
+#include "../Core/Controller.h"
 
 #define NTSC_TIMING 60
 #define PAL_TIMING 50
@@ -21,7 +21,6 @@ typedef struct NES
 {
     CPU6502 cpu;
     PPU ppu;
-    Bus bus;
     Cartridge cart;
     Graphics graphics;
     JoyPad Controller[2];
@@ -32,8 +31,3 @@ typedef struct NES
     char currentRomPath[NES_MAX_ROM_PATH];
     char currentRomName[NES_MAX_ROM_NAME];
 } NES;
-
-void NES_init(NES* nes, const char *filePath);
-void NES_start(NES* nes);
-void NES_reset(NES* nes);
-void NES_free(NES* nes);

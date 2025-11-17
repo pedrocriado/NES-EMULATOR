@@ -5,47 +5,44 @@
 #include <stdio.h>
 #include <ctype.h>
 
-//Rom file opening for windows
 #ifdef _WIN32
 #include <windows.h>
 #include <SDL_syswm.h>
 #endif
 
-#include "NES.h"
-#include "Controller.h"
 #include "Graphics.h"
+#include "NES.h"
+#include "../Core/Controller.h"
 
-static void NES_update_timing(NES* nes);
+
+static void NES_init(NES* nes, const char *filePath);
+static void NES_start(NES* nes);
+static void NES_reset(NES* nes);
+static void NES_free(NES* nes);
 static bool NES_load_cartridge(NES* nes, const char* romPath);
+static void NES_update_timing(NES* nes);
 static void NES_update_window_title(NES* nes);
 static void NES_handle_menu_command(NES* nes, uint32_t command);
-static void NES_reset_runtime_state(NES* nes);
-static void NES_refresh_controller_state(NES* nes);
+static void NES_keyboard_input(JoyPad* ctrl);
 
-void NES_init(NES* nes, const char* filePath)
+static void NES_init(NES* nes, const char* filePath)
 { 
     printf("[DEBUG] Initializing NES components\n");
     memset(nes, 0, sizeof(NES));
     
-
-    Bus_init(&nes->bus);
-    nes->bus.cpu = &nes->cpu;
-    nes->bus.ppu = &nes->ppu;
-    nes->bus.cart = &nes->cart;
+    nes->cpu.ppu = &nes->ppu;
+    nes->cpu.cart = &nes->cart;
 
     Controller_init(&nes->Controller[0]);
     Controller_init(&nes->Controller[1]);
-    nes->bus.controller[0] = &nes->Controller[0];
-    nes->bus.controller[1] = &nes->Controller[1];
+    nes->cpu.controller[0] = &nes->Controller[0];
+    nes->cpu.controller[1] = &nes->Controller[1];
 
-    nes->cpu.bus = &nes->bus;
-    nes->ppu.bus = &nes->bus;
     nes->ppu.cart = &nes->cart;
 
     Graphics_init(&nes->graphics);
     PPU_init(&nes->ppu);
 
-    nes->tvTiming = NTSC_TIMING;
     NES_update_timing(nes);
 
     if(filePath) {
@@ -55,7 +52,7 @@ void NES_init(NES* nes, const char* filePath)
     }
 }
 
-void NES_start(NES* nes)
+static void NES_start(NES* nes)
 {
     int running = 1;
     SDL_Event event;
@@ -72,18 +69,10 @@ void NES_start(NES* nes)
                     if(event.key.repeat == 0 &&
                        event.key.keysym.sym == SDLK_o &&
                        (event.key.keysym.mod & KMOD_CTRL)) {
-                        char romPath[NES_MAX_ROM_PATH] = {0};
+                        char romPath[NES_MAX_ROM_PATH];
                         if(Graphics_prompt_rom_selection(&nes->graphics, romPath, sizeof(romPath))) {
                             NES_load_cartridge(nes, romPath);
                         }
-                    }
-                    if(nes->cartLoaded && event.key.repeat == 0) {
-                        NES_refresh_controller_state(nes);
-                    }
-                    break;
-                case SDL_KEYUP:
-                    if(nes->cartLoaded) {
-                        NES_refresh_controller_state(nes);
                     }
                     break;
 #ifdef _WIN32
@@ -98,6 +87,7 @@ void NES_start(NES* nes)
 #endif
             }
         }
+        NES_keyboard_input(&nes->Controller[0]);
 
         if(nes->cartLoaded) {
             nes->ppu.frameComple = false;
@@ -119,7 +109,7 @@ void NES_start(NES* nes)
         uint64_t elapsed = now - prevTime;
         uint64_t target = nes->frameTiming ? nes->frameTiming : (frequency / NTSC_TIMING);
         if(elapsed < target) {
-            uint32_t delayMs = (uint32_t)(((target - elapsed) * 1000) / frequency);
+            uint32_t delayMs = (((target - elapsed) * 1000) / frequency);
             if(delayMs > 0) {
                 SDL_Delay(delayMs);
             }
@@ -130,16 +120,13 @@ void NES_start(NES* nes)
     NES_free(nes);
 }
 
-void NES_reset(NES* nes)
+static void NES_reset(NES* nes)
 {
-    if(nes->cartLoaded && nes->currentRomPath[0] != '\0') {
+    if(nes->cartLoaded && nes->currentRomPath[0] != '\0')
         NES_load_cartridge(nes, nes->currentRomPath);
-    } else {
-        NES_reset_runtime_state(nes);
-    }
 }
 
-void NES_free(NES* nes)
+static void NES_free(NES* nes)
 {
     if(!nes) return;
     Cartridge_reset(&nes->cart);
@@ -150,32 +137,6 @@ void NES_free(NES* nes)
     nes->cartLoaded = false;
 }
 
-static void NES_reset_runtime_state(NES* nes)
-{
-    memset(nes->bus.ram, 0, sizeof(nes->bus.ram));
-    Controller_init(&nes->Controller[0]);
-    Controller_init(&nes->Controller[1]);
-}
-
-static void NES_refresh_controller_state(NES* nes)
-{
-    const Uint8* keys = SDL_GetKeyboardState(NULL);
-    uint8_t state = 0;
-
-    if(keys[SDL_SCANCODE_RIGHT]) state |= 0x80;
-    if(keys[SDL_SCANCODE_LEFT])  state |= 0x40;
-    if(keys[SDL_SCANCODE_DOWN])  state |= 0x20;
-    if(keys[SDL_SCANCODE_UP])    state |= 0x10;
-    if(keys[SDL_SCANCODE_F])     state |= 0x08;
-    if(keys[SDL_SCANCODE_G])     state |= 0x04;
-    if(keys[SDL_SCANCODE_X])     state |= 0x02;
-    if(keys[SDL_SCANCODE_Z])     state |= 0x01;
-
-    if((state & 0x80) && (state & 0x40)) state &= ~0xC0;
-    if((state & 0x20) && (state & 0x10)) state &= ~0x30;
-
-    nes->bus.controller[0]->state = state;
-}
 
 static void NES_handle_menu_command(NES* nes, uint32_t command)
 {
@@ -255,24 +216,25 @@ static void NES_update_window_title(NES* nes)
     SDL_SetWindowTitle(nes->graphics.window, title);
 }
 
-static bool NES_load_cartridge(NES* nes, const char* romPath)
+bool NES_load_cartridge(NES* nes, const char* romPath)
 {
     if(!romPath || romPath[0] == '\0')
         return false;
 
     printf("[DEBUG] Loading ROM: %s\n", romPath);
 
-    NES_reset_runtime_state(nes);
+    memset(nes->cpu.ram, 0, sizeof(nes->cpu.ram));
+    Controller_init(&nes->Controller[0]);
+    Controller_init(&nes->Controller[1]);
     
     PPU_free(&nes->ppu);
 
     Cartridge_load(&nes->cart, romPath);
 
-    nes->bus.cart = &nes->cart;
+    nes->cpu.cart = &nes->cart;
     nes->ppu.cart = &nes->cart;
 
     PPU_init(&nes->ppu);
-    nes->ppu.bus = &nes->bus;
     nes->ppu.cart = &nes->cart;
 
     CPU_init(&nes->cpu);
@@ -288,4 +250,47 @@ static bool NES_load_cartridge(NES* nes, const char* romPath)
     nes->cartLoaded = true;
     printf("[DEBUG] ROM loaded successfully\n");
     return true;
+}
+
+static void NES_keyboard_input(JoyPad* ctrl)
+{
+    const Uint8* keys = SDL_GetKeyboardState(NULL);
+    uint8_t state = 0;
+
+    if(keys[SDL_SCANCODE_RIGHT]) state |= 0x80;
+    if(keys[SDL_SCANCODE_LEFT])  state |= 0x40;
+    if(keys[SDL_SCANCODE_DOWN])  state |= 0x20;
+    if(keys[SDL_SCANCODE_UP])    state |= 0x10;
+    if(keys[SDL_SCANCODE_F])     state |= 0x08;
+    if(keys[SDL_SCANCODE_G])     state |= 0x04;
+    if(keys[SDL_SCANCODE_X])     state |= 0x02;
+    if(keys[SDL_SCANCODE_Z])     state |= 0x01;
+
+    if((state & 0xC0) == 0xC0) state &= ~0xC0;
+    if((state & 0x30) == 0x30) state &= ~0x30;
+
+    ctrl->state = state;
+}
+
+int main(int argc, char *argv[]) {
+    printf("[DEBUG] Starting NES emulator\n");
+
+    const char *filePath = NULL;
+    if (argc > 1) {
+        filePath = argv[1];
+        printf("[DEBUG] Initial ROM argument detected: %s\n", filePath);
+    } else {
+        printf("[DEBUG] No ROM provided via command line. Use the File -> Open ROM menu.\n");
+    }
+    
+    printf("[DEBUG] About to initialize NES\n");
+    struct NES nes;
+    NES_init(&nes, filePath);
+    printf("[DEBUG] NES initialized\n");
+    
+    printf("[DEBUG] About to start NES\n");
+    NES_start(&nes);
+    printf("[DEBUG] NES stopped\n");
+    
+    return 0;
 }
