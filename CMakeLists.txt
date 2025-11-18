@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 
 include(FetchContent)
 
-option(BUILD_PB2_MDNS_EXAMPLES "Build the PocketBeagle/RPi5 mDNS socket samples" OFF)
+option(BUILD_PB2 "Build the PocketBeagle/RPi5 mDNS socket samples" OFF)
 
 # Shared core sources
 set(CORE_SOURCES
@@ -55,7 +55,7 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-if(BUILD_PB2_MDNS_EXAMPLES)
+if(BUILD_PB2)
     if(NOT UNIX)
         message(FATAL_ERROR "The PB2 mDNS samples currently support POSIX platforms only.")
     endif()

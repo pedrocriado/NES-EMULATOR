@@ -43,27 +43,30 @@ cmake --build build
 
 SDL2 is fetched and built as part of the project; you don’t need to install it system‑wide.
 
-### PocketBeagle ↔ Linux mDNS sample
+### PocketBeagle ↔ Linux streaming helper
 
-If you want a minimal example of how a PocketBeagle can announce itself over
-mDNS and exchange TCP packets with a Linux host (RPi, desktop, etc.), enable the
-optional CMake flag and use the helper binaries documented in
-`docs/pb2_mdns_demo.md`:
+Enable the `BUILD_PB2` CMake flag to build two extra binaries:
+
+- `pb2` — an mDNS-advertised PocketBeagle daemon that accepts ROM uploads over
+  TCP, streams the emulator framebuffer over UDP, and ingests controller bytes.
+- `linux_render` — a Linux desktop client that discovers the PB2 via DNS-SD,
+  uploads a ROM (optional), renders the streamed frames via SDL2, and forwards
+  keyboard input back to the board.
+
+Build them with:
 
 ```bash
-cmake -S . -B build -D HAZARDOUSNES_BUILD_PB2_MDNS_EXAMPLES=ON
+cmake -S . -B build -D BUILD_PB2=ON
 cmake --build build
 ```
 
-The build automatically downloads the lightweight [`mdns`](https://github.com/mjansson/mdns)
-library, so no system packages are required. The PB2 program publishes the
-`_haznes._tcp` service and waits for controller updates, while the Linux tool
-discovers the service via that embedded mDNS stack and sends sample payloads in
-both directions.
+Deployment and usage instructions live in `src/Pocket_Beagle_2/PB2_README.md`.
+That document covers copying the `pb2` binary to the board, launching both
+programs, and the packet format if you want to extend the streaming protocol.
 
 ## Run
 
-You can pass a ROM path on the command line, or by doing ctrl + O.
+You can select a rom by pressing ctrl + O. Windows systems has a drop file select button at the top of the window. Along side this options you can also run the emualtor by passing the rom file location.
 
 Windows
 ```bash
@@ -108,10 +111,12 @@ _Castlevania_
 
 ## Project Layout
 
-- `src/` – Emulator sources (CPU6502, PPU, Bus, Cartridge, Controller, Graphics)
-- `src/Mappers/` – implemented mappers
-- `nes_files/` – Place your ROMs here (ignored in .git); saves in `nes_files/saves/`
-- `CMakeLists.txt` – Build configuration (FetchContent SDL2)
+- `src/Core/` – Emulator sources (CPU6502, PPU, Bus, Cartridge, Controller).
+- `src/Core/Mappers/` – implemented mappers.
+- `src/Desktop/` – implementation of desktop application.
+- `src/Pocket_Beagle_2` – Port Emulator to the Pocket Beagle 2.
+- `nes_files/` – Place your ROMs here (ignored in .git); saves in `nes_files/saves/`.
+- `CMakeLists.txt` – Build configuration.
 
 ## Legal
 
