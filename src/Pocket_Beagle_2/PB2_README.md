@@ -1,80 +1,41 @@
-# PocketBeagle ↔ Linux Streaming Helper
+# PocketBeagle ↔ Linux mDNS TCP Demo
 
-The optional PB2 build produces two executables that let a PocketBeagle render
-a NES ROM headlessly and stream video/input to a Linux desktop over the
-network:
+This repository now ships with two tiny helper programs that demonstrate how a
+PocketBeagle (PB2) can advertise itself via mDNS/Bonjour and exchange TCP data
+with a Linux host (currently only tested with a raspberry pi 5) using plain BSD sockets.
 
-- `pb2` runs on the PocketBeagle. It announces the `_haznes._tcp` DNS-SD
-  service, accepts ROM uploads over TCP, streams 256×240 frames over UDP, and
-  feeds controller bytes back into the emulator.
-- `linux_render` runs on a Linux workstation/RPi. It discovers the PB2 via
-  mDNS, uploads a ROM, sends controller input (keyboard by default), and
-  renders the streamed frames via SDL2.
+- `pb2` — runs on the PocketBeagle2. It registers the
+  `_haznes._tcp` mDNS service, waits for a connection on TCP port `49733`,
+  prints controller payloads, and responds with example frame counters.
+- `linux_render` — runs on any modern Linux host (RPi, desktop, etc.). It browses
+  for the `_haznes._tcp` service, connects to the PB2, sends a handful of
+  controller inputs, and receives and render frames from the PB2.
 
-## Requirements
+## Dependencies
 
-- CMake 3.16+ and a standard C toolchain on both sides.
-- SDL2 is fetched automatically for the Linux renderer, so no extra packages.
-- The [`mdns`](https://github.com/mjansson/mdns) library is pulled in via
-  `FetchContent`. If you are missing CMake, install it with:
+No extra system packages are required. The optional build flag pulls the
+[`mdns`](https://github.com/mjansson/mdns) single-header mDNS/DNS-SD library via
+CMake’s `FetchContent`, so a standard toolchain (`cmake`, compiler, make) is all
+you need on both boards. You should run this command to install it:
+```bash
+sudo apt isntall cmake
+```
 
-  ```bash
-  sudo apt install cmake
-  ```
+## Building the samples
 
-- Ensure both devices share the same network segment (PB2 usually exposes
-  itself as `usb0`, the host can use any interface with multicast enabled).
-
-## Build
-
-From the project root:
+Enable the optional CMake toggle when configuring the project (disabled by
+defaul):
 
 ```bash
-cmake -S . -B build -D BUILD_PB2_MDNS_EXAMPLES=ON
+cmake -S . -B build -D BUILD_PB2=ON
 cmake --build build
 ```
 
-This produces `build/pb2` (ARM binary) and `build/linux_render` (x86/ARM host).
-
-## Deploying to the PocketBeagle
-
-Copy the PB2 executable to the board (replace host/user as needed):
-
+This produces two executables in the build folder `pb2` and
+`linux_render`. We will need run `pb2` on the pocket beagle 2. To do this will need to send the executable by running the command:
 ```bash
-scp build/pb2 debian@pb2.local:/home/debian/pb2
+scp /path/to/pb2 <name>@<ip>:/path/to/folder
 ```
+Now that the executable is on the Pocket Beagle 2 all you have to do is run it. When the PB2 server executable is running you can use the Linux client executable on your system to run and communicate with the system.
 
-SSH in and launch it:
-
-```bash
-ssh debian@pb2.local
-./pb2
-```
-
-The program prints its chosen IP + UDP port, then waits for a client.
-
-## Running the Linux Renderer
-
-On your desktop/RPi:
-
-```bash
-./build/linux_render [optional/path/to/game.nes]
-```
-
-Steps performed automatically:
-
-1. Discover `_haznes._tcp` via mDNS and connect to the PB2’s TCP port.
-2. Upload the ROM (if a path was supplied).
-3. Open a local UDP socket, send the port to the PB2, and start streaming.
-4. Render incoming frames via SDL2 and forward keyboard input back to PB2.
-
-If you omit the ROM argument, the PB2 keeps the last uploaded game.
-
-## Notes
-
-- The mDNS service name, TXT metadata, and packet format are documented in
-  `PB2.h`. If you change the service name, update both binaries.
-- You can record TAS-style controller logs by capturing the single input byte
-  sent per frame.
-- When debugging connectivity use `journalctl`/`dmesg` on PB2 to confirm the
-  interface (`usb0`, `eth1`, etc.) is up and has multicast enabled.
+TODO: add a file send function to allow the Pocket beagle to change from one game to another.
